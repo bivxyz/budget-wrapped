@@ -119,7 +119,11 @@ export function analyze(rawRows, config) {
   const byDay = {}
   for (const t of spending) {
     if (!t.date || NON_SPEND_BUCKETS.has(t.bucket)) continue
-    const key = t.date.toISOString().slice(0, 10)
+    const key = [
+      t.date.getFullYear(),
+      String(t.date.getMonth() + 1).padStart(2, '0'),
+      String(t.date.getDate()).padStart(2, '0'),
+    ].join('-')
     byDay[key] = (byDay[key] || 0) + t.amount
   }
   let running = 0

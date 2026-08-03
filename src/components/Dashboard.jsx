@@ -97,7 +97,7 @@ export default function Dashboard({ data, onReplay }) {
     return data.transactions
       .filter((t) => (catFilter === 'All' ? true : t.bucket === catFilter))
       .filter((t) =>
-        q ? t.name.toLowerCase().includes(q) || t.category.toLowerCase().includes(q) : true,
+        q ? t.name.toLowerCase().includes(q) || t.bucket.toLowerCase().includes(q) : true,
       )
       .sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0))
   }, [data, query, catFilter])

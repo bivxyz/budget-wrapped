@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "budget-wrapped",
+  "pages_build_output_dir": "dist",
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "budget-wrapped",
+    "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+  }]
+}

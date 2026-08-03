@@ -1,0 +1,16 @@
+import { analyze } from './finance.js'
+import { effectiveTransaction, monthlySummary } from './tracker.js'
+export function localDateKey(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
+export function monthKey(date){return localDateKey(date).slice(0,7)}
+export function daysInMonth(key){const [y,m]=key.split('-').map(Number);return new Date(y,m,0).getDate()}
+export function normalizeBudget(entry){return typeof entry==='number'?{target:entry,paced:true}:{target:Number(entry?.target||0),paced:entry?.paced!==false}}
+const config=(targets={})=>({providerId:'rocket-money',providerName:'Rocket Money Archive',columns:{date:'date',amount:'amount',category:'bucket',merchant:'name',account:'account',type:'flow'},sign:'expense-positive',categoryMap:{},budgetTargets:targets,excludedCategories:['Transfer','Investment','Ignore'],incomeCategories:[],inferIncomeBySign:false})
+export function analyzeArchiveMonth(rows,budgets={}){const targets=Object.fromEntries(Object.entries(budgets).map(([k,v])=>[k,normalizeBudget(v).target]));return analyze(rows.map(effectiveTransaction).filter(r=>r.flow==='Expense'||r.flow==='Income'),config(targets))}
+export function buildPortfolio(archive,budgetsByMonth={},today=new Date()){
+  const months=Object.keys(archive).sort(), currentCalendarKey=monthKey(today), selectedKey=archive[currentCalendarKey]?currentCalendarKey:months.at(-1)||currentCalendarKey
+  const analyses={}, monthly={}
+  for(const key of months){const budgets=budgetsByMonth[key]||{}, rows=archive[key], analysis=analyzeArchiveMonth(rows,budgets), summary=monthlySummary(rows), dim=daysInMonth(key),elapsed=key===currentCalendarKey?Math.max(1,today.getDate()):dim;const pacing=Object.entries(budgets).map(([bucket,raw])=>{const {target,paced}=normalizeBudget(raw),actual=summary.byCategory[bucket]||0,proratedTarget=paced&&key===currentCalendarKey?target*elapsed/dim:target;return{bucket,target,paced,actual,remaining:target-actual,percent:target?actual/target:null,proratedTarget,paceRatio:paced&&proratedTarget?actual/proratedTarget:null,projected:paced?actual/elapsed*dim:null}}).sort((a,b)=>b.actual-a.actual);const budgetTotal=pacing.reduce((s,x)=>s+x.target,0);analyses[key]=analysis;monthly[key]={...summary,pacing,budgetTotal,budgetRemaining:budgetTotal-summary.totalSpent,projectedTotal:pacing.reduce((s,x)=>s+(x.projected??x.actual),0)}}
+  const year=selectedKey.slice(0,4),ytdMonths=months.filter(m=>m.startsWith(year)&&m<=currentCalendarKey),ytdActual=ytdMonths.reduce((s,m)=>s+(monthly[m]?.totalSpent||0),0),ytdTarget=ytdMonths.reduce((s,m)=>s+(monthly[m]?.budgetTotal||0),0)
+  const categories=[...new Set(months.flatMap(m=>Object.keys(monthly[m].byCategory)))],trends=categories.map(bucket=>({bucket,series:months.map(m=>({month:m,actual:monthly[m].byCategory[bucket]||0,target:normalizeBudget(budgetsByMonth[m]?.[bucket]).target}))}))
+  return{months,analyses,monthly,currentKey:selectedKey,trends,ytd:{actual:ytdActual,target:ytdTarget,difference:ytdTarget-ytdActual}}
+}

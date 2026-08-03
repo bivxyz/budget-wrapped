@@ -1,0 +1,17 @@
+{
+  "2026": {
+    "Groceries": { "target": 1000, "paced": true },
+    "Restaurants/Fast Food": { "target": 750, "paced": true },
+    "Bills": { "target": 500, "paced": false },
+    "Shopping/Gifts": { "target": 500, "paced": true },
+    "Streaming/Entertainment": { "target": 60, "paced": false },
+    "Family Fun/Travel": { "target": 100, "paced": true },
+    "Home Improvement": { "target": 200, "paced": true },
+    "Car/Commute": { "target": 450, "paced": true },
+    "Medical": { "target": 25, "paced": true },
+    "Pet/Baby": { "target": 100, "paced": true },
+    "Self Care/Hobby": { "target": 200, "paced": true },
+    "Donations": { "target": 950, "paced": false },
+    "Investments": { "target": 0, "paced": false }
+  }
+}
