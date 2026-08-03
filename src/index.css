@@ -1,0 +1,39 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-base: #0f1117;
+  --color-base-2: #161922;
+  --color-accent-green: #00ff87;
+  --color-accent-coral: #ff6b6b;
+  --color-accent-gold: #ffd700;
+  --color-accent-sky: #00d4ff;
+  --color-accent-purple: #a855f7;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-base);
+  color: #fff;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hide scrollbar on the slideshow but keep it on the dashboard */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

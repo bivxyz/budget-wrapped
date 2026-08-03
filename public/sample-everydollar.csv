@@ -1,0 +1,19 @@
+Date,Merchant,Group,Category,Amount,Type
+2026-05-01,Employer Payroll,Income,Paycheck,3200.00,Income
+2026-05-15,Employer Payroll,Income,Paycheck,3200.00,Income
+2026-05-03,Kroger,Food,Groceries,156.20,Expense
+2026-05-12,Aldi,Food,Groceries,94.55,Expense
+2026-05-20,Kroger,Food,Groceries,112.40,Expense
+2026-05-05,Chick-fil-A,Food,Restaurants,22.80,Expense
+2026-05-09,Local Diner,Food,Restaurants,41.15,Expense
+2026-05-06,Shell,Transportation,Gas,48.00,Expense
+2026-05-21,State Farm,Insurance,Auto Insurance,140.00,Expense
+2026-05-07,City Electric,Housing,Utilities,132.00,Expense
+2026-05-10,Internet Co,Housing,Internet,80.00,Expense
+2026-05-02,Mortgage Lender,Housing,Mortgage,1450.00,Expense
+2026-05-14,Amazon,Lifestyle,Shopping,68.99,Expense
+2026-05-18,Target,Lifestyle,Shopping,53.20,Expense
+2026-05-22,Local Church,Giving,Tithe,640.00,Expense
+2026-05-16,Fidelity,Savings,Retirement,400.00,Expense
+2026-05-04,Ally Bank,Savings,Emergency Fund,300.00,Expense
+2026-05-25,Movie Theater,Lifestyle,Entertainment,34.00,Expense
