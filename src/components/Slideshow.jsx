@@ -281,6 +281,7 @@ export default function Slideshow({ data, onDone }) {
       return (
         <Slide accent={accent(0)}>
           <Eyebrow accent={accent(0)}>Budget Report Card</Eyebrow>
+          {Number.isFinite(data.budgetTotal)&&<div className="mb-5 text-center"><div className="text-sm text-white/50">Official monthly limit</div><div className="text-2xl font-black">{formatCurrency(data.budgetTotal)}</div><div className={`text-sm ${data.budgetRemaining<0?'text-accent-coral':'text-accent-green'}`}>{formatCurrency(Math.abs(data.budgetRemaining))} {data.budgetRemaining<0?'over':'remaining'}</div></div>}
           <div className="flex justify-center gap-8 mb-6">
             <div>
               <div className="text-4xl font-black text-accent-green">

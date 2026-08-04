@@ -7,15 +7,15 @@ import Dashboard from './components/Dashboard.jsx'
 import PortfolioDashboard from './components/PortfolioDashboard.jsx'
 import { analyze } from './lib/finance.js'
 import { buildPortfolio } from './lib/portfolio.js'
-import { budgetsByMonth } from './lib/tracker.js'
+import { budgetLimitsByMonth, budgetsByMonth } from './lib/tracker.js'
 import { detectProvider } from './lib/providers.js'
 import { fetchSharedState,mergeArchive,postJson } from './lib/sharedState.js'
 
 export default function App(){
-  const [shared,setShared]=useState({transactions:[],budgets:[],lastUpload:null,available:false})
+  const [shared,setShared]=useState({transactions:[],budgets:[],budgetSettings:[],lastUpload:null,available:false})
   const refreshShared=useCallback(async()=>{try{const state=await fetchSharedState();setShared({...state,available:true})}catch(error){setShared(current=>({...current,available:false,error:error.message}))}},[])
   useEffect(()=>{refreshShared()},[refreshShared])
-  const mergedArchive=useMemo(()=>mergeArchive(archivePayload.months,shared.transactions),[shared.transactions]),monthlyBudgets=useMemo(()=>budgetsByMonth(shared.budgets),[shared.budgets]),portfolio=useMemo(()=>buildPortfolio(mergedArchive,monthlyBudgets),[mergedArchive,monthlyBudgets]),hasArchive=portfolio.months.length>0,deepLink=new URLSearchParams(location.search).get('m')
+  const mergedArchive=useMemo(()=>mergeArchive(archivePayload.months,shared.transactions),[shared.transactions]),monthlyBudgets=useMemo(()=>budgetsByMonth(shared.budgets),[shared.budgets]),monthlyLimits=useMemo(()=>budgetLimitsByMonth(shared.budgetSettings||[]),[shared.budgetSettings]),portfolio=useMemo(()=>buildPortfolio(mergedArchive,monthlyBudgets,new Date(),monthlyLimits),[mergedArchive,monthlyBudgets,monthlyLimits]),hasArchive=portfolio.months.length>0,deepLink=new URLSearchParams(location.search).get('m')
   const [stage,setStage]=useState(hasArchive?'portfolio':'loading'),[parsed,setParsed]=useState(null),[detected,setDetected]=useState(null),[data,setData]=useState(null)
   useEffect(()=>{if(stage!=='loading')return;if(shared.available)setStage('portfolio');else if(shared.error)setStage('upload')},[stage,shared.available,shared.error])
   const handleParsed=({rows,headers,sample})=>{const det=detectProvider(headers);setParsed({rows,headers});setDetected(det);if(sample){setData(analyze(rows,det.provider.makeConfig(headers)));setStage('slideshow')}else setStage('review')}

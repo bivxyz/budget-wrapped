@@ -27,5 +27,9 @@ export function monthlySummary(rows) {
 }
 
 export function budgetsByMonth(rows) {
-  return rows.reduce((result,row) => { (result[row.monthKey] ||= {})[row.bucket] = {target:Number(row.target),paced:row.paced}; return result }, {})
+  return rows.reduce((result,row) => { (result[row.monthKey] ||= {})[row.bucket] = {target:Number(row.target),paced:row.paced,sortOrder:Number(row.sortOrder)||0}; return result }, {})
+}
+
+export function budgetLimitsByMonth(rows) {
+  return rows.reduce((result,row) => { result[row.monthKey]=Number(row.spendingLimit)||0; return result }, {})
 }

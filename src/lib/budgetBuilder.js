@@ -1,0 +1,5 @@
+export const budgetMoney=value=>Math.max(0,Number(value)||0)
+export const budgetSnapshot=(limit,items)=>JSON.stringify({limit:budgetMoney(limit),items:items.map(({bucket,target,paced})=>({bucket,target:budgetMoney(target),paced}))})
+export function priorActualPlan(previous){return Object.entries(previous?.byCategory||{}).filter(([,amount])=>amount>0).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).map(([bucket,amount])=>({bucket,target:Number(amount.toFixed(2)),paced:true}))}
+export function allocationTotals(limit,items){const allocated=items.reduce((sum,item)=>sum+budgetMoney(item.target),0),ceiling=budgetMoney(limit);return{allocated,unallocated:Math.max(0,ceiling-allocated),over:Math.max(0,allocated-ceiling)}}
+export function reorderBudgetItems(rows,bucket,before){const from=rows.findIndex(row=>row.bucket===bucket),to=rows.findIndex(row=>row.bucket===before);if(from<0||to<0||from===to)return rows;const next=[...rows],[item]=next.splice(from,1);next.splice(from<to?to-1:to,0,item);return next}
