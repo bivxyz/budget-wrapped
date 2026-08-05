@@ -11,6 +11,17 @@ export function buildPortfolio(archive,budgetsByMonth={},today=new Date(),budget
   const analyses={}, monthly={}
   for(const key of months){const budgets=budgetsByMonth[key]||{}, rows=archive[key], analysis=analyzeArchiveMonth(rows,budgets), summary=monthlySummary(rows), dim=daysInMonth(key),elapsed=key===currentCalendarKey?Math.max(1,today.getDate()):dim;const pacing=Object.entries(budgets).map(([bucket,raw])=>{const {target,paced}=normalizeBudget(raw),actual=summary.byCategory[bucket]||0,proratedTarget=paced&&key===currentCalendarKey?target*elapsed/dim:target;return{bucket,target,paced,sortOrder:Number(raw?.sortOrder)||0,actual,remaining:target-actual,percent:target?actual/target:null,proratedTarget,paceRatio:paced&&proratedTarget?actual/proratedTarget:null,projected:paced?actual/elapsed*dim:null}}).sort((a,b)=>a.sortOrder-b.sortOrder||a.bucket.localeCompare(b.bucket));const allocatedTotal=pacing.reduce((s,x)=>s+x.target,0),budgetTotal=Object.prototype.hasOwnProperty.call(budgetLimits,key)?Number(budgetLimits[key])||0:allocatedTotal,budgetRemaining=budgetTotal-summary.totalSpent;Object.assign(analysis,{budgetTotal,budgetRemaining,allocatedBudgetTotal:allocatedTotal});analyses[key]=analysis;monthly[key]={...summary,pacing,allocatedTotal,budgetTotal,budgetRemaining,projectedTotal:pacing.reduce((s,x)=>s+(x.projected??x.actual),0)}}
   const year=selectedKey.slice(0,4),ytdMonths=months.filter(m=>m.startsWith(year)&&m<=currentCalendarKey),ytdActual=ytdMonths.reduce((s,m)=>s+(monthly[m]?.totalSpent||0),0),ytdTarget=ytdMonths.reduce((s,m)=>s+(monthly[m]?.budgetTotal||0),0)
-  const categories=[...new Set(months.flatMap(m=>Object.keys(monthly[m].byCategory)))],trends=categories.map(bucket=>({bucket,series:months.map(m=>({month:m,actual:monthly[m].byCategory[bucket]||0,target:normalizeBudget(budgetsByMonth[m]?.[bucket]).target}))}))
+  const categories=[...new Set(months.flatMap(m=>[...Object.keys(monthly[m].byCategory),...Object.keys(budgetsByMonth[m]||{})]))],trends=categories.map(bucket=>({bucket,series:months.map(m=>({month:m,actual:monthly[m].byCategory[bucket]||0,target:normalizeBudget(budgetsByMonth[m]?.[bucket]).target}))}))
   return{months,analyses,monthly,currentKey:selectedKey,trends,ytd:{actual:ytdActual,target:ytdTarget,difference:ytdTarget-ytdActual}}
+}
+
+export function annualTrendView(portfolio,year){
+  const months=portfolio.months.filter(month=>month.startsWith(`${year}-`))
+  const actual=months.reduce((sum,month)=>sum+(portfolio.monthly[month]?.totalSpent||0),0)
+  const target=months.reduce((sum,month)=>sum+(portfolio.monthly[month]?.budgetTotal||0),0)
+  const categories=portfolio.trends.map(trend=>{
+    const series=trend.series.filter(point=>point.month.startsWith(`${year}-`))
+    return{...trend,series,actual:series.reduce((sum,point)=>sum+point.actual,0),target:series.reduce((sum,point)=>sum+point.target,0)}
+  }).filter(trend=>trend.actual>0||trend.target>0).sort((a,b)=>b.actual-a.actual||b.target-a.target||a.bucket.localeCompare(b.bucket))
+  return{actual,target,difference:target-actual,categories}
 }
