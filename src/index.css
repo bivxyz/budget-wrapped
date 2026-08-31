@@ -44,6 +44,15 @@ table th, table td { padding: .75rem 1rem; text-align: left; }
 .primary-button { background: var(--color-accent-green); color: #07120c; }
 .secondary-button { background: rgba(255,255,255,.1); color: white; }
 .primary-button:disabled, .secondary-button:disabled { opacity: .35; cursor: not-allowed; }
+.icon-button { display: inline-grid; width: 2.75rem; height: 2.75rem; flex: 0 0 2.75rem; place-items: center; border-radius: .65rem; transition: .15s; }
+.icon-button-primary { background: var(--color-accent-green); color: #07120c; }
+.icon-button-secondary { background: rgba(255,255,255,.1); color: white; }
+.icon-button-danger { background: color-mix(in srgb, var(--color-accent-coral) 12%, transparent); color: var(--color-accent-coral); }
+.icon-button:hover:not(:disabled) { filter: brightness(1.13); }
+.icon-button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.icon-button:disabled { opacity: .35; cursor: not-allowed; }
+.icon-spinner { width: 1.1rem; height: 1.1rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 999px; animation: icon-spin .7s linear infinite; }
+@keyframes icon-spin { to { transform: rotate(360deg); } }
 .select-menu-button { display:flex; align-items:center; justify-content:space-between; gap:.65rem; min-height:2.35rem; background:#20242e; border:1px solid rgba(255,255,255,.12); border-radius:.55rem; padding:.5rem .7rem; color:#fff; text-align:left; }
 .select-menu-button:focus-visible { outline:2px solid var(--color-accent-sky); outline-offset:1px; }
 .select-chevron { color:rgba(255,255,255,.55); transition:transform .15s; }

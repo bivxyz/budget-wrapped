@@ -13,6 +13,7 @@ import {
   Cell,
 } from 'recharts'
 import { formatCurrency } from '../lib/finance.js'
+import IconButton from './IconButton.jsx'
 
 const GREEN = '#00FF87'
 const CORAL = '#FF6B6B'
@@ -122,12 +123,7 @@ export default function Dashboard({ data, onReplay }) {
           </div>
           <h1 className="text-3xl font-black">{data.periodLabel} Dashboard</h1>
         </div>
-        <button
-          onClick={onReplay}
-          className="text-sm font-semibold px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition"
-        >
-          ↺ Replay Wrapped
-        </button>
+        <IconButton onClick={onReplay} icon="replay" label="Replay Wrapped" />
       </div>
 
       {/* Section A — summary cards */}
