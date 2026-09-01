@@ -21,7 +21,7 @@ export function trueSpending(rows) {
 export function monthlySummary(rows) {
   const spending = trueSpending(rows), byCategory = {}, highestByCategory = {}
   for (const row of spending) { byCategory[row.bucket] = (byCategory[row.bucket] || 0) + row.amount; if (row.amount > 0 && (!highestByCategory[row.bucket] || row.amount > highestByCategory[row.bucket].amount)) highestByCategory[row.bucket] = row }
-  const topExpenses = spending.filter((row) => row.amount > 0 && row.rawCategory !== 'Loan Payment').sort((a,b) => b.amount-a.amount).slice(0,5)
+  const topExpenses = spending.filter((row) => row.amount > 0 && row.bucket !== 'Fixed Expenses' && row.rawCategory !== 'Loan Payment').sort((a,b) => b.amount-a.amount).slice(0,5)
   const topCategories = Object.entries(byCategory).map(([bucket,amount]) => ({bucket,amount,highestExpense:highestByCategory[bucket]||null})).sort((a,b) => b.amount-a.amount).slice(0,5)
   return { totalSpent:spending.reduce((sum,row)=>sum+row.amount,0), topExpenses, topCategories, byCategory }
 }

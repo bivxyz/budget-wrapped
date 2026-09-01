@@ -4,7 +4,9 @@ import { PieChart, Pie, Cell } from 'recharts'
 import { CountUpDollar, CountUpInt } from './CountUpNumber.jsx'
 import { formatCurrency, PALETTE } from '../lib/finance.js'
 
-const ADVANCE_MS = 4000
+const DEFAULT_ADVANCE_MS = 5000
+const DETAIL_ADVANCE_MS = 7000
+const DETAIL_SLIDES = new Set([4, 8, 9])
 
 // Each slide: a dark base with an accent-colored radial glow + accent text.
 const SLIDE_BG = (accent) =>
@@ -321,6 +323,7 @@ export default function Slideshow({ data, onDone }) {
 
   const [index, setIndex] = useState(0)
   const total = slides.length
+  const advanceMs = DETAIL_SLIDES.has(index) ? DETAIL_ADVANCE_MS : DEFAULT_ADVANCE_MS
 
   const next = useCallback(() => {
     setIndex((i) => {
@@ -336,9 +339,9 @@ export default function Slideshow({ data, onDone }) {
 
   // auto-advance
   useEffect(() => {
-    const timer = setTimeout(next, ADVANCE_MS)
+    const timer = setTimeout(next, advanceMs)
     return () => clearTimeout(timer)
-  }, [index, next])
+  }, [advanceMs, index, next])
 
   // keyboard controls
   useEffect(() => {
@@ -362,7 +365,7 @@ export default function Slideshow({ data, onDone }) {
               initial={false}
               animate={{ width: i < index ? '100%' : i === index ? '100%' : '0%' }}
               transition={{
-                duration: i === index ? ADVANCE_MS / 1000 : 0.2,
+                duration: i === index ? advanceMs / 1000 : 0.2,
                 ease: 'linear',
               }}
               key={`${i}-${index}`}

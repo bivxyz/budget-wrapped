@@ -6,6 +6,7 @@ import { buildTransactions, formatCurrency, parseAmount, parseDate } from './fie
 
 export { formatCurrency, parseAmount, parseDate }
 
+const INDIVIDUAL_RANKING_EXCLUDED_BUCKETS = new Set(['Fixed Expenses'])
 // Buckets that represent investing/savings rather than consumption.
 const NON_SPEND_BUCKETS = new Set(['Investments'])
 
@@ -77,7 +78,7 @@ export function analyze(rawRows, config) {
   // --- biggest single purchase (positive spend row) ---
   let biggestPurchase = null
   for (const t of spending) {
-    if (NON_SPEND_BUCKETS.has(t.bucket)) continue
+    if (NON_SPEND_BUCKETS.has(t.bucket) || INDIVIDUAL_RANKING_EXCLUDED_BUCKETS.has(t.bucket)) continue
     if (t.amount > 0 && (!biggestPurchase || t.amount > biggestPurchase.amount)) {
       biggestPurchase = { name: t.name, amount: t.amount, category: t.bucket, date: t.date }
     }
