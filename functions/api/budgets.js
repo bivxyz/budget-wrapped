@@ -4,6 +4,8 @@ export async function onRequestPost({request,env}){
   try{
     const db=requireDb(env),body=await request.json(),email=actor(request),now=new Date().toISOString()
     if(!validMonth(body.monthKey))return json({error:'Invalid month'},400)
+    const closeout=await db.prepare('SELECT month_key FROM monthly_closeouts WHERE month_key=?').bind(body.monthKey).first()
+    if(closeout)return json({error:'Reopen this month before editing its budget.'},409)
     if(body.action==='savePlan'){
       const limit=Number(body.spendingLimit),categories=Array.isArray(body.categories)?body.categories:[]
       if(!Number.isFinite(limit)||limit<0||categories.length>200)return json({error:'Invalid budget plan'},400)
