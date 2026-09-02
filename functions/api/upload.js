@@ -1,4 +1,5 @@
 import { actor, json, requireDb } from './_utils.js'
+import { latestTransactionMonth } from '../../src/lib/monthlyHome.js'
 const key = (t) => [t.date, t.amount, t.name, t.account || ''].join('|')
 
 export async function onRequestPost({ request, env }) {
@@ -21,7 +22,11 @@ export async function onRequestPost({ request, env }) {
       key(t),t.date,Number(t.amount),String(t.name),t.rawCategory||'',t.bucket||'Uncategorized',t.account||'',t.flow==='Income'?1:0,t.flow||'Expense',now,email))
     for (let index = 0; index < statements.length; index += 50) await db.batch(statements.slice(index,index+50))
     const added = uniqueKeys.filter((value) => !existing.has(value)).length, unchanged = keys.length-added
-    await db.prepare('INSERT INTO upload_events (file_name,row_count,added_count,unchanged_count,uploaded_at,uploaded_by) VALUES (?,?,?,?,?,?)').bind(body.fileName||'transactions.csv',keys.length,added,unchanged,now,email).run()
-    return json({ ok:true, added, unchanged })
+    const latestMonth = latestTransactionMonth(body.transactions)
+    if (!latestMonth) return json({ error: 'No valid transaction month found' }, 400)
+    const upload = await db.prepare('INSERT INTO upload_events (file_name,row_count,added_count,unchanged_count,uploaded_at,uploaded_by) VALUES (?,?,?,?,?,?)').bind(body.fileName||'transactions.csv',keys.length,added,unchanged,now,email).run()
+    const uploadEventId = Number(upload.meta.last_row_id)
+    await db.prepare(`INSERT INTO monthly_reviews(month_key,upload_event_id,reviewed_at,reviewed_by) VALUES(?,?,NULL,NULL) ON CONFLICT(month_key) DO UPDATE SET upload_event_id=excluded.upload_event_id,reviewed_at=NULL,reviewed_by=NULL`).bind(latestMonth,uploadEventId).run()
+    return json({ ok:true, added, unchanged, latestMonth, uploadEventId })
   } catch (error) { return json({ error:error.message }, 400) }
 }
