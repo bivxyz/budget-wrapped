@@ -18,7 +18,7 @@ export function activePlanningMonth(months,currentCalendarKey,closeouts=[]){
   return months.includes(currentCalendarKey)?currentCalendarKey:months.at(-1)||currentCalendarKey
 }
 export function budgetStreak(archive,monthly,currentCalendarKey,budgetLimits={}){
-  const imported=new Set(Object.keys(archive).filter(key=>(archive[key]||[]).length>0&&key<currentCalendarKey).sort()),throughMonth=[...imported].at(-1)||null
+  const imported=new Set(Object.keys(archive).filter(key=>(archive[key]||[]).some(row=>row.source!=='manual'&&!row.deletedAt&&!row.matchedTxnKey)&&key<currentCalendarKey).sort()),throughMonth=[...imported].at(-1)||null
   if(!throughMonth)return{current:0,best:0,amount:0,throughMonth:null,recent:[]}
   const statusFor=month=>{if(!imported.has(month))return{month,status:'no-data',difference:null};const budget=monthly[month]?.budgetTotal||0;if(!Object.prototype.hasOwnProperty.call(budgetLimits,month)||budget<=0)return{month,status:'no-budget',difference:null};const difference=budget-(monthly[month]?.totalSpent||0);return{month,status:difference>=0?'success':'miss',difference}}
   const recent=Array.from({length:6},(_,index)=>statusFor(shiftMonth(throughMonth,index-5)))

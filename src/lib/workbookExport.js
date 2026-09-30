@@ -1,3 +1,4 @@
+import { activeTransactions } from './weekly.js'
 import { monthlySummary } from './tracker.js'
 
 const COLORS={navy:'111318',panel:'181C24',green:'00FF87',white:'F7F7F7'}
@@ -22,8 +23,8 @@ function styleSheet(sheet,widths,currencyColumns=[],percentColumns=[]){
 
 function addTracking(workbook,transactions){
   const sheet=workbook.addWorksheet('Tracking',{properties:{tabColor:{argb:COLORS.green}}})
-  sheet.addRow(['Date','Expense / merchant','Amount','Effective category','Effective flow','Account','Rocket Money category','Original app category','Category override','Flow override','Transaction key'])
-  transactions.slice().sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name)).forEach(row=>sheet.addRow([localDate(row.date),cellText(row.name),Number(row.amount)||0,cellText(row.bucket),cellText(row.flow),cellText(row.account),cellText(row.rawCategory),cellText(row.originalBucket),cellText(row.overrideBucket),cellText(row.overrideFlow),cellText(row.txnKey)]))
+  sheet.addRow(['Date','Expense / merchant','Amount','Effective category','Effective flow','Account','Rocket Money category','Original app category','Category override','Flow override','Transaction key','Source','Created at','Created by','Matched import key','Deleted at','Counts in totals'])
+  transactions.slice().sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name)).forEach(row=>sheet.addRow([localDate(row.date),cellText(row.name),Number(row.amount)||0,cellText(row.bucket),cellText(row.flow),cellText(row.account),cellText(row.rawCategory),cellText(row.originalBucket),cellText(row.overrideBucket),cellText(row.overrideFlow),cellText(row.txnKey),row.source||'import',cellText(row.createdAt),cellText(row.createdBy),cellText(row.matchedTxnKey),cellText(row.deletedAt),!row.matchedTxnKey&&!row.deletedAt?'Yes':'No']))
   sheet.getColumn(1).numFmt='mmm d, yyyy';styleSheet(sheet,[14,32,14,24,16,20,25,24,24,16,48],[3])
 }
 
@@ -43,7 +44,9 @@ export async function buildBudgetWorkbook({scope,month,shared,portfolio}){
   if(!shared.available)throw new Error('Shared family data is unavailable. Reconnect before exporting.')
   const module=await import('exceljs'),ExcelJS=module.default||module,workbook=new ExcelJS.Workbook();workbook.creator='Budget Wrapped';workbook.created=new Date();workbook.modified=new Date();workbook.subject='Private family budget snapshot'
   const allTransactions=shared.transactions||[],months=scope==='month'?[month]:[...new Set([...allTransactions.map(row=>row.date.slice(0,7)),...(shared.budgets||[]).map(row=>row.monthKey)])].sort(),transactions=scope==='month'?allTransactions.filter(row=>row.date.startsWith(month)):allTransactions
-  addTracking(workbook,transactions);addBudgets(workbook,months,shared.budgets||[],portfolio,scope==='month'?'Budget':'Monthly Budgets');addSummary(workbook,months,transactions,portfolio,scope==='month'?'Summary':'Monthly Summary');if(scope==='full')addUploads(workbook,shared.uploadHistory||[]);addInfo(workbook,{scope:scope==='full'?'Complete family archive':`Selected month: ${month}`,months,transactions,lastUpload:shared.lastUpload})
+  addTracking(workbook,transactions);addBudgets(workbook,months,shared.budgets||[],portfolio,scope==='month'?'Budget':'Monthly Budgets');addSummary(workbook,months,activeTransactions(transactions),portfolio,scope==='month'?'Summary':'Monthly Summary');if(scope==='full')addUploads(workbook,shared.uploadHistory||[]);addInfo(workbook,{scope:scope==='full'?'Complete family archive':`Selected month: ${month}`,months,transactions,lastUpload:shared.lastUpload})
+  if((shared.transactionMatches||[]).length){const audit=workbook.addWorksheet('Reconciliation Audit');audit.addRow(['Manual key','Imported key','Prior override','Applied override','Matched at','Matched by','Undone at']);(shared.transactionMatches||[]).filter(match=>scope==='full'||transactions.some(row=>row.txnKey===match.manualKey||row.txnKey===match.importedKey)).forEach(match=>audit.addRow([match.manualKey,match.importedKey,match.previousOverride,match.appliedOverride,match.linkedAt,match.linkedBy,match.undoneAt]));styleSheet(audit,[48,48,24,24,25,30,25]);}
+  const settings=(shared.savingsSettings||[]).filter(row=>scope==='full'||row.monthKey===month);if(settings.length){const sheet=workbook.addWorksheet('Savings Plan');sheet.addRow(['Month','Expected income','Savings target','Grocery baseline','Restaurant baseline','Updated at','Updated by']);settings.forEach(row=>sheet.addRow([row.monthKey,row.income/100,row.savings/100,row.groceriesBaseline/100,row.restaurantsBaseline/100,row.updatedAt,row.updatedBy]));styleSheet(sheet,[14,20,20,20,20,25,30],[2,3,4,5]);}
   const stamp=todayKey(),fileName=scope==='full'?`budget-wrapped-full-${stamp}.xlsx`:`budget-wrapped-${month}-${stamp}.xlsx`;return {workbook,fileName}
 }
 

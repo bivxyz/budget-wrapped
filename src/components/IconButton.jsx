@@ -7,7 +7,11 @@ const paths={
   plus:<><path d="M12 5v14M5 12h14"/></>,
   trash:<><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></>,
   up:<><path d="m6 15 6-6 6 6"/></>,
-  down:<><path d="m6 9 6 6 6-6"/></>
+  down:<><path d="m6 9 6 6 6-6"/></>,
+  home:<><path d="m3 11 9-8 9 8"/><path d="M5 10v11h14V10"/><path d="M9 21v-7h6v7"/></>,
+  transactions:<><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></>,
+  weekly:<><path d="M4 6h16v14H4z"/><path d="M8 3v6M16 3v6M4 10h16"/></>,
+  trends:<><path d="M4 19V5M4 19h16"/><path d="m7 15 4-5 3 3 5-7"/></>
 }
 
 export function Icon({name,size=19}){return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>}
