@@ -55,7 +55,7 @@ test('exact matching requires unique amount/date/merchant/account and preserves 
   assert.equal(matchSuggestions([manual,{...imported,overrideBucket:'Dining'}])[0].automatic,false)
   assert.equal(matchSuggestions([manual,imported],[{manualKey:'m',importedKey:'i',undoneAt:'now'}])[0].automatic,false)
 })
-test('manual spending affects net profit but never imported coverage; audit entries do not count', () => {
+test('manual spending affects savings or loss but never imported coverage; audit entries do not count', () => {
   const row={date:'2026-08-31',source:'manual',amount:10,flow:'Expense',bucket:'Groceries'}
   const result=monthlySummary([row,{...row,matchedTxnKey:'i'},{...row,deletedAt:'now'}])
   assert.equal(result.totalSpent,10);assert.equal(result.netProfit,-10);assert.equal(result.coverageThrough,null);assert.equal(result.fullMonthData,false)

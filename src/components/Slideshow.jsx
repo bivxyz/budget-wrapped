@@ -73,7 +73,7 @@ export default function Slideshow({ data, onDone }) {
           That’s where your money went across every category this month.
           {data.net >= 0 ? (
             <>
-              {' '}You still came out{' '}
+              {' '}After expenses and investment contributions, you came out{' '}
               <span className="text-accent-green font-bold">
                 {formatCurrency(data.net)} ahead
               </span>
@@ -81,7 +81,7 @@ export default function Slideshow({ data, onDone }) {
             </>
           ) : (
             <>
-              {' '}You ran{' '}
+              {' '}After expenses and investment contributions, you ran{' '}
               <span className="text-accent-coral font-bold">
                 {formatCurrency(Math.abs(data.net))} over
               </span>{' '}

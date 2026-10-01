@@ -132,7 +132,7 @@ export default function Dashboard({ data, onReplay }) {
           <SummaryCard label="Total Income" value={formatCurrency(data.income)} accent={GREEN} />
           <SummaryCard label="Total Spent" value={formatCurrency(data.totalSpent)} accent={CORAL} />
           <SummaryCard
-            label="Net"
+            label="Savings / Loss"
             value={formatCurrency(data.net)}
             accent={data.net >= 0 ? GREEN : CORAL}
             sub={data.net >= 0 ? 'surplus' : 'deficit'}

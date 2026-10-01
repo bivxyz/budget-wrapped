@@ -10,7 +10,7 @@ export function analyzeArchiveMonth(rows,budgets={},summary=monthlySummary(rows)
   const targets=Object.fromEntries(Object.entries(budgets).map(([k,v])=>[k,normalizeBudget(v).target])),analysis=analyze(rows.map(effectiveTransaction).filter(r=>r.flow==='Expense'||r.flow==='Income'),config(targets))
   const categories=analysis.categories.map(category=>{const actual=summary.byCategory[category.bucket]||0,diff=category.budget-actual,status=category.hasBudget&&!category.trackOnly?(actual<=category.budget?'under':'over'):'none';return{...category,actual,diff,status}})
   const top=summary.topCategories[0],biggest=summary.topExpenses[0]
-  return{...analysis,income:summary.totalIncome,totalSpent:summary.totalSpent,net:summary.netProfit,topCategory:top?{name:top.bucket,amount:top.amount}:null,biggestPurchase:biggest?{name:biggest.name,amount:biggest.amount,category:biggest.bucket,date:biggest.date}:null,bucketTotals:summary.byCategory,categories,spendingAudit:summary.spendingAudit}
+  return{...analysis,income:summary.totalIncome,totalSpent:summary.totalSpent,investmentContributions:summary.investmentContributions,savingsLoss:summary.savingsLoss,net:summary.savingsLoss,topCategory:top?{name:top.bucket,amount:top.amount}:null,biggestPurchase:biggest?{name:biggest.name,amount:biggest.amount,category:biggest.bucket,date:biggest.date}:null,bucketTotals:summary.byCategory,categories,spendingAudit:summary.spendingAudit}
 }
 export function shiftMonth(key,offset){const [year,month]=key.split('-').map(Number),date=new Date(year,month-1+offset,1);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`}
 export function portfolioMonths(archive={},budgets={},limits={},closeouts=[]){

@@ -41,7 +41,7 @@ const auditGroup = () => ({ count: 0, grossCents: 0 })
 const publicGroup = group => ({ count: group.count, gross: dollars(group.grossCents) })
 
 export function spendingAudit(rows = []) {
-  let grossPurchases = 0, refunds = 0, income = 0
+  let grossPurchases = 0, refunds = 0, income = 0, investmentContributions = 0
   const excluded = { creditCardPayments: auditGroup(), internalTransfers: auditGroup(), otherTransfers: auditGroup(), investments: auditGroup(), ignored: auditGroup() }
   const needsReview = { uncategorized: 0, cashAndChecks: 0, ambiguousMatches: 0 }
   for (const transaction of rows) {
@@ -57,14 +57,15 @@ export function spendingAudit(rows = []) {
     else if (kind === 'refund') refunds += Math.abs(amount)
     else if (kind === 'income') income += Math.max(0, -amount)
     else {
+      if (kind === 'investment') investmentContributions += Math.max(0, amount)
       const group = kind === 'credit-card-payment' ? excluded.creditCardPayments : kind === 'internal-transfer' ? excluded.internalTransfers : kind === 'other-transfer' ? excluded.otherTransfers : kind === 'investment' ? excluded.investments : excluded.ignored
       group.count += 1
       group.grossCents += Math.abs(amount)
     }
   }
-  const trueSpending = grossPurchases - refunds
+  const trueSpending = grossPurchases - refunds, operatingNet = income - trueSpending, savingsLoss = operatingNet - investmentContributions
   return {
-    grossPurchases: dollars(grossPurchases), refunds: dollars(refunds), trueSpending: dollars(trueSpending), income: dollars(income), netProfit: dollars(income - trueSpending),
+    grossPurchases: dollars(grossPurchases), refunds: dollars(refunds), trueSpending: dollars(trueSpending), income: dollars(income), investmentContributions: dollars(investmentContributions), operatingNet: dollars(operatingNet), savingsLoss: dollars(savingsLoss), netProfit: dollars(savingsLoss),
     excluded: { creditCardPayments: publicGroup(excluded.creditCardPayments), internalTransfers: publicGroup(excluded.internalTransfers), otherTransfers: publicGroup(excluded.otherTransfers), investments: publicGroup(excluded.investments), ignored: publicGroup(excluded.ignored) },
     needsReview,
   }
@@ -90,7 +91,7 @@ export function monthlySummary(rows) {
   const topExpenses = spending.filter(row => Number(row.amount) > 0 && row.bucket !== 'Fixed Expenses' && normalize(row.rawCategory) !== 'loan payment').sort((a, b) => b.amount - a.amount).slice(0, 5)
   const topCategories = Object.entries(byCategory).map(([bucket, amount]) => ({ bucket, amount, highestExpense: highestByCategory[bucket] || null })).sort((a, b) => b.amount - a.amount).slice(0, 5)
   const dates = active.filter(row => row.source !== 'manual').map(row => String(row.date || '')).filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date)).sort(), coverageThrough = dates.at(-1) || null, monthKey = coverageThrough?.slice(0, 7) || null, monthEnd = monthEndDate(monthKey)
-  return { totalSpent: audit.trueSpending, totalIncome: audit.income, netProfit: audit.netProfit, spendingAudit: audit, topExpenses, topCategories, byCategory, coverageThrough, monthEnd, fullMonthData: Boolean(coverageThrough && coverageThrough === monthEnd) }
+  return { totalSpent: audit.trueSpending, totalIncome: audit.income, investmentContributions: audit.investmentContributions, operatingNet: audit.operatingNet, savingsLoss: audit.savingsLoss, netProfit: audit.savingsLoss, spendingAudit: audit, topExpenses, topCategories, byCategory, coverageThrough, monthEnd, fullMonthData: Boolean(coverageThrough && coverageThrough === monthEnd) }
 }
 
 export function budgetsByMonth(rows) { return rows.reduce((result, row) => { (result[row.monthKey] ||= {})[row.bucket] = { target: Number(row.target), paced: row.paced, sortOrder: Number(row.sortOrder) || 0 }; return result }, {}) }
