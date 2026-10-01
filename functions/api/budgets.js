@@ -17,7 +17,9 @@ export async function onRequestPost({request,env}){
         ...categories.map((item,index)=>db.prepare('INSERT INTO monthly_budgets(month_key,bucket,target,paced,sort_order,updated_at,updated_by) VALUES(?,?,?,?,?,?,?)').bind(body.monthKey,String(item.bucket).trim(),Number(item.target),item.paced===false?0:1,index,now,email)),
       ]
       await db.batch(statements)
-      return json({ok:true,categoryCount:categories.length})
+      const savings=await db.prepare('SELECT income_cents,savings_cents FROM monthly_savings_settings WHERE month_key=?').bind(body.monthKey).first(),budget=Math.round(limit*100)
+      const spendable=savings?Number(savings.income_cents)-Number(savings.savings_cents):null,shortfall=spendable==null?0:Math.max(0,budget-spendable)
+      return json({ok:true,categoryCount:categories.length,affordability:{spendable,budget,shortfall}})
     }
     return json({error:'Invalid budget update'},400)
   }catch(error){return json({error:error.message},400)}

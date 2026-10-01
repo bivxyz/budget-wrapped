@@ -5,6 +5,7 @@ import { buildPortfolio } from './lib/portfolio.js'
 import { budgetLimitsByMonth,budgetsByMonth } from './lib/tracker.js'
 import { fetchSharedState,mergeArchive,postJson } from './lib/sharedState.js'
 import { activeTransactions, dateKey } from './lib/weekly.js'
+import { matchSuggestions } from './lib/reconciliation.js'
 
 const emptyShared={transactions:[],budgets:[],budgetSettings:[],monthlyReviews:[],monthlyCloseouts:[],lastUpload:null,available:false}
 
@@ -12,7 +13,8 @@ export default function App(){
   const [shared,setShared]=useState(emptyShared),[loading,setLoading]=useState(true)
   const refreshShared=useCallback(async()=>{try{const state=await fetchSharedState();setShared({...state,available:true,error:null})}catch(error){setShared(current=>({...current,available:false,error:error.message}));throw error}finally{setLoading(false)}},[])
   useEffect(()=>{refreshShared().catch(()=>{})},[refreshShared])
-  const mergedArchive=useMemo(()=>mergeArchive(shared.available?{[dateKey().slice(0,7)]:[]}:archivePayload.months,activeTransactions(shared.transactions)),[shared.transactions,shared.available])
+  const sharedTransactions=useMemo(()=>{const ambiguous=new Set(matchSuggestions(shared.transactions||[],shared.transactionMatches||[]).flatMap(pair=>[pair.manual.txnKey,pair.imported.txnKey]));return activeTransactions(shared.transactions||[]).map(row=>ambiguous.has(row.txnKey)?{...row,matchStatus:'ambiguous'}:row)},[shared.transactions,shared.transactionMatches])
+  const mergedArchive=useMemo(()=>mergeArchive(shared.available?{[dateKey().slice(0,7)]:[]}:archivePayload.months,sharedTransactions),[sharedTransactions,shared.available])
   const monthlyBudgets=useMemo(()=>budgetsByMonth(shared.budgets),[shared.budgets])
   const monthlyLimits=useMemo(()=>budgetLimitsByMonth(shared.budgetSettings||[]),[shared.budgetSettings])
   const closeoutMonths=useMemo(()=>(shared.monthlyCloseouts||[]).map(row=>row.monthKey),[shared.monthlyCloseouts])

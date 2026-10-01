@@ -1,5 +1,5 @@
 import { activeTransactions } from './weekly.js'
-import { monthlySummary } from './tracker.js'
+import { monthlySummary, transactionDisposition } from './tracker.js'
 
 const COLORS={navy:'111318',panel:'181C24',green:'00FF87',white:'F7F7F7'}
 const currency='"$"#,##0.00;[Red]-"$"#,##0.00'
@@ -23,9 +23,9 @@ function styleSheet(sheet,widths,currencyColumns=[],percentColumns=[]){
 
 function addTracking(workbook,transactions){
   const sheet=workbook.addWorksheet('Tracking',{properties:{tabColor:{argb:COLORS.green}}})
-  sheet.addRow(['Date','Expense / merchant','Amount','Effective category','Effective flow','Account','Rocket Money category','Original app category','Category override','Flow override','Transaction key','Source','Created at','Created by','Matched import key','Deleted at','Counts in totals'])
-  transactions.slice().sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name)).forEach(row=>sheet.addRow([localDate(row.date),cellText(row.name),Number(row.amount)||0,cellText(row.bucket),cellText(row.flow),cellText(row.account),cellText(row.rawCategory),cellText(row.originalBucket),cellText(row.overrideBucket),cellText(row.overrideFlow),cellText(row.txnKey),row.source||'import',cellText(row.createdAt),cellText(row.createdBy),cellText(row.matchedTxnKey),cellText(row.deletedAt),!row.matchedTxnKey&&!row.deletedAt?'Yes':'No']))
-  sheet.getColumn(1).numFmt='mmm d, yyyy';styleSheet(sheet,[14,32,14,24,16,20,25,24,24,16,48],[3])
+  sheet.addRow(['Date','Expense / merchant','Amount','Effective category','Effective flow','Account','Rocket Money category','Original app category','Category override','Flow override','Transaction key','Source','Created at','Created by','Matched import key','Deleted at','Active record','Counts as true spending','Disposition'])
+  transactions.slice().sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name)).forEach(row=>{const disposition=transactionDisposition(row),active=!row.matchedTxnKey&&!row.deletedAt;sheet.addRow([localDate(row.date),cellText(row.name),Number(row.amount)||0,cellText(row.bucket),cellText(row.flow),cellText(row.account),cellText(row.rawCategory),cellText(row.originalBucket),cellText(row.overrideBucket),cellText(row.overrideFlow),cellText(row.txnKey),row.source||'import',cellText(row.createdAt),cellText(row.createdBy),cellText(row.matchedTxnKey),cellText(row.deletedAt),active?'Yes':'No',active&&disposition.kind==='purchase'?'Yes':active&&disposition.kind==='refund'?'Refund / credit':'No',disposition.kind])})
+  sheet.getColumn(1).numFmt='mmm d, yyyy';styleSheet(sheet,[14,32,14,24,16,20,25,24,24,16,48,14,22,24,48,22,14,22,22],[3])
 }
 
 function budgetRows(months,budgets,portfolio){return months.flatMap(month=>budgets.filter(row=>row.monthKey===month).map(row=>{const monthly=portfolio.monthly[month],metric=monthly?.pacing.find(item=>item.bucket===row.bucket),actual=metric?.actual||0,target=Number(row.target)||0;return [month,row.bucket,target,row.paced?'Paced':'Lumpy',actual,target-actual,target?actual/target:null,row.paced?(metric?.projected??actual):null,monthly?.budgetTotal||0,(monthly?.budgetTotal||0)-(monthly?.allocatedTotal||0)]}))}

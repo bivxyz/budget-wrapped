@@ -4,8 +4,17 @@ import Papa from 'papaparse'
 import { buildTransactions } from '../src/lib/fields.js'
 import { getProvider } from '../src/lib/providers.js'
 import { DATA_DIR, dateKey, newestCsv, parseArgs } from './lib/shared.mjs'
-export const transactionKey = (t) => [t.date instanceof Date ? dateKey(t.date) : t.date, t.amount, t.name, t.account].join('|')
-export function mergeTransactions(stored, incoming) { const map = new Map(stored.map((t)=>[transactionKey(t),t])); let added=0; for (const t of incoming) if (!map.has(transactionKey(t))) { map.set(transactionKey(t),t); added++ } return { rows:[...map.values()].sort((a,b)=>String(a.date).localeCompare(String(b.date))), added, unchanged:incoming.length-added } }
+import { assignImportKeys, transactionBaseKey } from '../src/lib/importIdentity.js'
+export const transactionKey = transactionBaseKey
+export function mergeTransactions(stored, incoming) {
+  const map = new Map(assignImportKeys(stored).map(transaction => [transaction.importKey, transaction])), keyed = assignImportKeys(incoming)
+  let added = 0
+  for (const transaction of keyed) {
+    if (!map.has(transaction.importKey)) added += 1
+    map.set(transaction.importKey, { ...map.get(transaction.importKey), ...transaction })
+  }
+  return { rows: [...map.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.importKey.localeCompare(b.importKey)), added, unchanged: incoming.length - added }
+}
 export async function ingest({ file, dryRun=false, downloadsDir }={}) {
   const csv = file || await newestCsv(downloadsDir)
   const parsed = Papa.parse(await fs.readFile(csv,'utf8'),{header:true,skipEmptyLines:true}); if (parsed.errors.length) throw new Error(parsed.errors[0].message)

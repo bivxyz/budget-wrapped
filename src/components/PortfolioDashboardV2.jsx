@@ -15,10 +15,10 @@ import { annualTrendView,shiftMonth } from '../lib/portfolio.js'
 import { postJson } from '../lib/sharedState.js'
 
 const tabs=[['overview','Overview','home'],['transactions','Transactions','transactions'],['weekly','Weekly Budget','weekly'],['trends','Trends & YTD','trends']]
-const emptyMonth={totalSpent:0,totalIncome:0,netProfit:0,topExpenses:[],topCategories:[],byCategory:{},pacing:[],budgetPerformance:{over:[],under:[]},budgetTotal:0,budgetRemaining:0,projectedTotal:0}
+const emptyMonth={totalSpent:0,totalIncome:0,netProfit:0,topExpenses:[],topCategories:[],byCategory:{},pacing:[],budgetPerformance:{over:[],under:[]},budgetTotal:0,budgetRemaining:0,projectedTotal:0,spendingAudit:{grossPurchases:0,refunds:0,trueSpending:0,income:0,netProfit:0,excluded:{creditCardPayments:{count:0,gross:0},internalTransfers:{count:0,gross:0},otherTransfers:{count:0,gross:0},investments:{count:0,gross:0},ignored:{count:0,gross:0}},needsReview:{uncategorized:0,cashAndChecks:0,ambiguousMatches:0}}}
 
 export default function PortfolioDashboardV2({portfolio,archive,shared,onSharedChanged,onOverride,defaultBudgets,initialMonth}){
-  const [month,setMonth]=useState(initialMonth||portfolio.currentKey),[view,setView]=useState('overview'),[budgetDirty,setBudgetDirty]=useState(false),[discardVersion,setDiscardVersion]=useState(0),[reviewBusy,setReviewBusy]=useState(false),[reviewError,setReviewError]=useState(''),[statusBusy,setStatusBusy]=useState(false),[statusError,setStatusError]=useState('')
+  const [month,setMonth]=useState(initialMonth||portfolio.currentKey),[view,setView]=useState('overview'),[transactionPreset,setTransactionPreset]=useState(null),[budgetDirty,setBudgetDirty]=useState(false),[discardVersion,setDiscardVersion]=useState(0),[reviewBusy,setReviewBusy]=useState(false),[reviewError,setReviewError]=useState(''),[statusBusy,setStatusBusy]=useState(false),[statusError,setStatusError]=useState('')
   const [manualForm,setManualForm]=useState(null),[manualNotice,setManualNotice]=useState('')
   const rows=archive[month]||[],monthly=portfolio.monthly[month]||emptyMonth,data=portfolio.analyses[month]
   const categories=useMemo(()=>[...new Set([...Object.values(archive).flat().map(effectiveTransaction).filter(row=>row.flow==='Expense').map(row=>row.bucket),...Object.keys(defaultBudgets),...monthly.pacing.map(row=>row.bucket),'Uncategorized'].filter(Boolean))].sort(),[archive,defaultBudgets,monthly.pacing])
@@ -28,9 +28,11 @@ export default function PortfolioDashboardV2({portfolio,archive,shared,onSharedC
   const selectMonth=value=>{if(value===month)return true;if(!discardDraft('Discard the unsaved monthly budget draft?'))return false;setMonth(value);history.replaceState(null,'',`?m=${value}`);return true}
   const selectYear=year=>{const sameMonth=`${year}-${month.slice(5)}`,available=portfolio.months.filter(key=>key.startsWith(`${year}-`));selectMonth(available.includes(sameMonth)?sameMonth:available.at(-1)||sameMonth)}
   const changeView=next=>{if(next===view)return true;if(!discardDraft('Discard the unsaved monthly budget draft?'))return false;setView(next);return true}
+  const navigate=next=>{const changed=changeView(next);if(changed&&next==='transactions')setTransactionPreset(null);return changed}
+  const openTransactions=(preset=null)=>{if(!changeView('transactions'))return false;setTransactionPreset(preset?{...preset,version:Date.now()}:null);return true}
   const beforeUpload=()=>locked?false:discardDraft('Discard the unsaved monthly budget draft and choose a Rocket Money CSV?')
   const openUpload=()=>{if(!changeView('overview'))return;setTimeout(()=>document.getElementById('rocket-upload-button')?.click(),0)}
-  const handleUploaded=async result=>{await onSharedChanged();if(result.latestMonth){setMonth(result.latestMonth);history.replaceState(null,'',`?m=${result.latestMonth}`)}setReviewError('');setView('transactions')}
+  const handleUploaded=async result=>{await onSharedChanged();if(result.latestMonth){setMonth(result.latestMonth);history.replaceState(null,'',`?m=${result.latestMonth}`)}setReviewError('');setTransactionPreset(null);setView('transactions')}
   const completeReview=async()=>{if(!review)return;setReviewBusy(true);setReviewError('');try{await postJson('/api/review',{monthKey:month,uploadEventId:review.uploadEventId,revision:review.revision||0});await onSharedChanged()}catch(error){setReviewError(error.message)}finally{setReviewBusy(false)}}
   const changeMonthStatus=async action=>{if(!discardDraft('Discard the unsaved budget draft before changing month status?'))return;const verb=action==='close'?'Close':'Reopen';if(!window.confirm(`${verb} ${monthLabelLong(month)}?`))return;setStatusBusy(true);setStatusError('');try{await postJson('/api/month-status',{action,monthKey:month});await onSharedChanged();if(action==='close'){const next=shiftMonth(month,1);setMonth(next);setView('overview');history.replaceState(null,'',`?m=${next}`)}}catch(error){setStatusError(error.message)}finally{setStatusBusy(false)}}
   const openManual=row=>{if(discardDraft('Discard the unsaved budget draft before adding or editing an expense?'))setManualForm({row})}
@@ -39,7 +41,7 @@ export default function PortfolioDashboardV2({portfolio,archive,shared,onSharedC
   const statusLabel=locked?'Closed':rows.some(row=>row.source!=='manual')?'In progress':monthly.budgetTotal>0?'Budget ready':'Planning'
   if(view==='slideshow'&&data)return <Slideshow data={data} onDone={()=>setView('overview')}/>
   return <div className="budget-app-shell">
-    <Navigation view={view} onChange={changeView}/>
+    <Navigation view={view} onChange={navigate}/>
     <div className="budget-app-canvas">
       <header className="budget-titlebar">
         <div className="titlebar-identity"><div className="titlebar-brand">Budget Wrapped</div><div className="titlebar-period"><strong>{monthLabelLong(month)}</strong><span className={`month-status month-status-${statusLabel.toLowerCase().replace(' ','-')}`}>{statusLabel}</span></div></div>
@@ -58,12 +60,12 @@ export default function PortfolioDashboardV2({portfolio,archive,shared,onSharedC
         {manualForm&&<ManualExpense row={manualForm.row} categories={categories} accounts={accounts} onClose={()=>setManualForm(null)} onSaved={manualSaved}/>} 
         {view==='transactions'&&<ReconciliationPanel shared={shared} month={month} onChanged={onSharedChanged}/>} 
         {view==='weekly'&&<WeeklyBudget key={`${month}:${discardVersion}`} month={month} shared={shared} onChanged={onSharedChanged} onDirtyChange={setBudgetDirty}/>} 
-        {view==='overview'&&<MonthlyHome month={month} monthly={monthly} rows={rows} previous={previous} categories={categories} setting={setting} shared={shared} streak={portfolio.streak} review={review} closeout={closeout} statusBusy={statusBusy} statusError={statusError} onMonthStatus={changeMonthStatus} onSharedChanged={onSharedChanged} onUploaded={handleUploaded} onOpenTransactions={()=>changeView('transactions')} onOpenWeekly={()=>changeView('weekly')} onReplay={()=>changeView('slideshow')} onDirtyChange={setBudgetDirty} beforeUpload={beforeUpload} discardVersion={discardVersion}/>} 
-        {view==='transactions'&&<TransactionTracker rows={rows} categories={categories} onOverride={onOverride} review={review} busy={reviewBusy} error={reviewError} onReview={completeReview} locked={locked||!shared.available} onEditManual={openManual} onChanged={onSharedChanged}/>} 
+        {view==='overview'&&<MonthlyHome month={month} monthly={monthly} rows={rows} previous={previous} categories={categories} setting={setting} shared={shared} streak={portfolio.streak} review={review} closeout={closeout} statusBusy={statusBusy} statusError={statusError} onMonthStatus={changeMonthStatus} onSharedChanged={onSharedChanged} onUploaded={handleUploaded} onOpenTransactions={openTransactions} onOpenWeekly={()=>changeView('weekly')} onReplay={()=>changeView('slideshow')} onDirtyChange={setBudgetDirty} beforeUpload={beforeUpload} discardVersion={discardVersion}/>}
+        {view==='transactions'&&<TransactionTracker rows={rows} categories={categories} preset={transactionPreset} onOverride={onOverride} review={review} busy={reviewBusy} error={reviewError} onReview={completeReview} locked={locked||!shared.available} onEditManual={openManual} onChanged={onSharedChanged}/>}
         {view==='trends'&&<Trends portfolio={portfolio} year={selectedYear}/>} 
       </main>
     </div>
-    <Navigation view={view} onChange={changeView} mobile/>
+    <Navigation view={view} onChange={navigate} mobile/>
   </div>
 }
 

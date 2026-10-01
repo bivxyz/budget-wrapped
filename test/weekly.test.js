@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cents, dailyAllowance, incomeSuggestion, monday, recommendWeekly, weeklyBaselines, weeklySummary } from '../src/lib/weekly.js'
+import { cents, dailyAllowance, incomeSuggestion, monday, monthlyFromWeekly, previousMonthWeekly, recommendWeekly, savingsPosition, weeklyBaselines, weeklyFromMonthly, weeklySummary } from '../src/lib/weekly.js'
 import { matchSuggestions } from '../src/lib/reconciliation.js'
 import { monthlySummary } from '../src/lib/tracker.js'
 
@@ -26,11 +26,24 @@ test('covered zero-spending weeks count; partial and current weeks do not', () =
   assert.equal(weeklyBaselines(rows,[{from:'2026-08-04',through:'2026-08-30'}],'2026-08-31').weeks,3)
 })
 test('recommendations reserve savings, prioritize groceries, and expose shortfalls and bonus', () => {
-  const base={income:500000,savings:100000,other:250000,groceries:100000,restaurants:80000}
-  assert.deepEqual(recommendWeekly(base),{available:150000,groceries:100000,restaurants:50000,shortfall:0,bonus:0})
-  assert.equal(recommendWeekly({...base,other:350000}).shortfall,50000)
-  assert.equal(recommendWeekly({...base,income:600000}).bonus,70000)
+  const base={income:550000,savings:100000,other:250000,groceries:20000,restaurants:15000}
+  assert.deepEqual(recommendWeekly(base),{available:200000,groceries:20000,restaurants:15000,groceriesMonthly:86667,restaurantsMonthly:65000,shortfall:0,bonus:48333})
+  assert.equal(recommendWeekly({...base,other:400000}).shortfall,101667)
+  assert.equal(recommendWeekly({...base,income:650000}).bonus,148333)
   assert.equal(recommendWeekly({...base,income:0}).groceries,0)
+})
+test('weekly and monthly target conversions are stable to the cent',()=>{
+  for(const weekly of [0,1,9999,20000,32145])assert.equal(weeklyFromMonthly(monthlyFromWeekly(weekly)),weekly)
+})
+test('previous month weekly context uses effective expenses and reports coverage',()=>{
+  const rows=[{date:'2026-08-02',amount:100,flow:'Expense',bucket:'Groceries'},{date:'2026-08-03',amount:-10,flow:'Expense',bucket:'Groceries'},{date:'2026-08-04',amount:20,flow:'Transfer',bucket:'Groceries'},{date:'2026-08-05',amount:50,flow:'Expense',bucket:'Restaurants/Fast Food'}]
+  const partial=previousMonthWeekly(rows,[],'2026-09');assert.equal(partial.complete,false);assert.equal(partial.categories[0].monthly,9000)
+  const complete=previousMonthWeekly(rows,[{from:'2026-08-01',through:'2026-08-31'}],'2026-09');assert.equal(complete.complete,true);assert.equal(complete.categories[0].weekly,2077)
+})
+test('savings position separates selected goal, extra capacity, and shortfall',()=>{
+  assert.deepEqual(savingsPosition({income:1000000,savings:100000,budget:700000,projected:650000}),{spendable:900000,extra:200000,shortfall:0,planned:300000,projected:350000})
+  assert.equal(savingsPosition({income:1000000,savings:500000,budget:600000}).shortfall,100000)
+  assert.deepEqual(savingsPosition({income:50000,savings:100000,budget:20000,projected:80000}),{spendable:-50000,extra:0,shortfall:70000,planned:30000,projected:-30000})
 })
 test('exact matching requires unique amount/date/merchant/account and preserves uncertainty', () => {
   const manual={txnKey:'m',source:'manual',date:'2026-08-03',amount:20,name:' Market ',account:' Card ',bucket:'Groceries',flow:'Expense'}

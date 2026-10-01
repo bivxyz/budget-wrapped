@@ -3,6 +3,8 @@ import { effectiveTransaction } from './tracker.js'
 export const WEEKLY_CATEGORIES = ['Groceries', 'Restaurants/Fast Food']
 export const cents = value => Math.round((Number(value) || 0) * 100)
 export const dollars = value => value / 100
+export const monthlyFromWeekly = value => Math.round((Number(value) || 0) * 52 / 12)
+export const weeklyFromMonthly = value => Math.round((Number(value) || 0) * 12 / 52)
 export const dateKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 export const validMonth = value => /^\d{4}-(0[1-9]|1[0-2])$/.test(value || '')
 export function validDate(value) {
@@ -55,6 +57,17 @@ export function weeklyBaselines(rows, coverage, asOf = dateKey()) {
     return { bucket, weekly, monthly: weekly == null ? null : Math.round(weekly * 52 / 12) }
   }) }
 }
+export function previousMonthWeekly(rows, coverage, month) {
+  const [year,number] = month.split('-').map(Number), date = new Date(year, number - 2, 1)
+  const previous = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  const days = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate(), from = `${previous}-01`, through = `${previous}-${String(days).padStart(2, '0')}`
+  const complete = coverage.some(range => range.from <= from && range.through >= through)
+  const expenses = activeTransactions(rows).map(effectiveTransaction).filter(row => row.flow === 'Expense' && row.date >= from && row.date <= through)
+  return { month: previous, complete, categories: WEEKLY_CATEGORIES.map(bucket => {
+    const monthly = expenses.filter(row => row.bucket === bucket).reduce((sum, row) => sum + cents(row.amount), 0)
+    return { bucket, monthly, weekly: weeklyFromMonthly(monthly) }
+  }) }
+}
 export function incomeSuggestion(rows, reviews, asOf = dateKey(), coverage = []) {
   const months = reviews.filter(row => row.reviewedAt && row.monthKey < asOf.slice(0, 7) && Array.from({length:new Date(Number(row.monthKey.slice(0,4)),Number(row.monthKey.slice(5)),0).getDate()},(_,index)=>shiftDay(`${row.monthKey}-01`,index)).every(day=>coverage.some(range=>range.from<=day&&range.through>=day)) && rows.some(t => t.source !== 'manual' && t.date.startsWith(row.monthKey))).map(row => row.monthKey).sort().slice(-3)
   if (!months.length) return { months, amount: null }
@@ -63,7 +76,13 @@ export function incomeSuggestion(rows, reviews, asOf = dateKey(), coverage = [])
 }
 export function recommendWeekly({ income, savings, other, groceries, restaurants }) {
   const available = income - savings - other
-  const groceryTarget = Math.min(groceries, Math.max(0, available))
-  const restaurantTarget = Math.min(restaurants, Math.max(0, available - groceryTarget))
-  return { available, groceries: groceryTarget, restaurants: restaurantTarget, shortfall: Math.max(0, groceries - available), bonus: Math.max(0, available - groceryTarget - restaurantTarget) }
+  const groceryBaseline = monthlyFromWeekly(groceries), restaurantBaseline = monthlyFromWeekly(restaurants)
+  const groceryMonthly = Math.min(groceryBaseline, Math.max(0, available))
+  const restaurantMonthly = Math.min(restaurantBaseline, Math.max(0, available - groceryMonthly))
+  return { available, groceries: weeklyFromMonthly(groceryMonthly), restaurants: weeklyFromMonthly(restaurantMonthly), groceriesMonthly: groceryMonthly, restaurantsMonthly: restaurantMonthly, shortfall: Math.max(0, groceryBaseline + restaurantBaseline - Math.max(0, available)), bonus: Math.max(0, available - groceryMonthly - restaurantMonthly) }
+}
+
+export function savingsPosition({ income = 0, savings = 100000, budget = 0, projected = 0 }) {
+  const extra = income - savings - budget
+  return { spendable: income - savings, extra: Math.max(0, extra), shortfall: Math.max(0, -extra), planned: income - budget, projected: income - projected }
 }
