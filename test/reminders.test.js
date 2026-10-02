@@ -15,12 +15,12 @@ function database() {
 }
 const call = async (handler, DB, body, token) => { const response=await handler({env:{DB,REMINDER_AGENT_TOKEN:'agent-secret'},request:new Request('https://example.test/api',{method:'POST',headers:{'content-type':'application/json',...(token?{'X-Budget-Reminder-Token':token}:{})},body:JSON.stringify(body)})}); return {httpStatus:response.status,...await response.json()} }
 
-test('weekly reminder explains rollover and stale data',()=>{
+test('weekly reminder uses concise emoji lines and slash-formatted dates',()=>{
   const budgets=[{monthKey:'2027-02',bucket:'Groceries',target:1000},{monthKey:'2027-02',bucket:'Restaurants/Fast Food',target:400}],row={date:'2027-02-03',amount:200,bucket:'Groceries',flow:'Expense'}
   const applied=composeWeeklyReminder(weeklySummary([row],budgets,'2027-02-08',{coverage:[{from:'2027-02-01',through:'2027-02-07'}]}))
-  assert.match(applied.text,/\$300\.06/);assert.match(applied.text,/\$50\.04 rollover/)
+  assert.equal(applied.text,'Budget this week (02/08–02/14):\n🛒 Groceries: $300.06\n🍽️ Dining: $200.06')
   const stale=composeWeeklyReminder(weeklySummary([row],budgets,'2027-02-08'))
-  assert.match(stale.text,/rollover pending/);assert.match(stale.text,/Update or confirm last week/)
+  assert.equal(stale.text,'Budget this week (02/08–02/14):\n🛒 Groceries: $250.02\n🍽️ Dining: $100.03')
 })
 test('cutback preview ranks variable risks, excludes fixed expenses, and handles a healthy month',()=>{
   const rows=[{date:'2026-10-10',amount:90,bucket:'Groceries',flow:'Expense'},{date:'2026-10-10',amount:5000,bucket:'Fixed Expenses',flow:'Expense'}],budgets=[{monthKey:'2026-10',bucket:'Groceries',target:100},{monthKey:'2026-10',bucket:'Fixed Expenses',target:5000}]

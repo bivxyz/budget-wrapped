@@ -7,17 +7,15 @@ const normalize = value => String(value || '').trim().toLowerCase()
 
 export function composeWeeklyReminder(summary) {
   const lines = summary.categories.map(category => {
-    const label = category.bucket === WEEKLY_CATEGORIES[0] ? 'Groceries' : 'Dining'
-    if (category.available == null) return `${label}: budget not set.`
-    const rollover = category.rollover > 0 ? ` (${money(category.baseAllowance)} base + ${money(category.rollover)} rollover)` : category.rolloverStatus === 'pending' ? ' (base only; rollover pending)' : ' (base)'
-    if (category.segments.length === 1) return `${label}: ${money(category.available)}${rollover}; ${money(category.monthRemaining)} left in ${shortMonth(category.segments[0].monthKey)}.`
-    const months = category.segments.map(segment => shortMonth(segment.monthKey)).join('/')
-    return `${label}: ${money(category.available)}${rollover}; ${months} week, rollover resets at the month boundary.`
+    const groceries = category.bucket === WEEKLY_CATEGORIES[0]
+    const label = groceries ? 'Groceries' : 'Dining'
+    const icon = groceries ? '🛒' : '🍽️'
+    return `${icon} ${label}: ${category.available == null ? 'Budget not set' : money(category.available)}`
   })
-  const pending = summary.categories.some(category => category.rolloverStatus === 'pending')
+  const date = value => value.slice(5).replace('-', '/')
   return {
     kind: 'weekly', canSend: true,
-    text: `Budget this week (${summary.start.slice(5)}–${summary.end.slice(5)}): ${lines.join(' ')}${pending ? ' Update or confirm last week to unlock rollover.' : ''}`,
+    text: `Budget this week (${date(summary.start)}–${date(summary.end)}):\n${lines.join('\n')}`,
   }
 }
 
