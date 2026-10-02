@@ -7,7 +7,7 @@ import { fetchSharedState,mergeArchive,postJson } from './lib/sharedState.js'
 import { activeTransactions, dateKey } from './lib/weekly.js'
 import { matchSuggestions } from './lib/reconciliation.js'
 
-const emptyShared={transactions:[],budgets:[],budgetSettings:[],monthlyReviews:[],monthlyCloseouts:[],lastUpload:null,available:false}
+const emptyShared={transactions:[],budgets:[],budgetSettings:[],monthlyReviews:[],monthlyCloseouts:[],weeklyConfirmations:[],reminderHistory:[],lastUpload:null,available:false}
 
 export default function App(){
   const [shared,setShared]=useState(emptyShared),[loading,setLoading]=useState(true)

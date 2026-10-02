@@ -18,6 +18,33 @@ test('cross-month allowances require both targets and spending uses active expen
   assert.equal(result.allowance,13000);assert.equal(result.spent,2500);assert.equal(result.remaining,10500)
   assert.equal(weeklySummary(rows,budgets.slice(0,1),'2026-09-01').categories[0].allowance,null)
 })
+test('confirmed underspending rolls forward while stale and overspent weeks keep the base',()=>{
+  const budgets=[{monthKey:'2027-02',bucket:'Groceries',target:1000},{monthKey:'2027-02',bucket:'Restaurants/Fast Food',target:400}]
+  const row=amount=>({date:'2027-02-03',name:'Market',bucket:'Groceries',flow:'Expense',amount})
+  const stale=weeklySummary([row(200)],budgets,'2027-02-08').categories[0]
+  assert.equal(stale.baseAllowance,25002);assert.equal(stale.rollover,0);assert.equal(stale.available,25002);assert.equal(stale.rolloverStatus,'pending')
+  const covered=weeklySummary([row(200)],budgets,'2027-02-08',{coverage:[{from:'2027-02-01',through:'2027-02-07'}]}).categories[0]
+  assert.equal(covered.baseAllowance,25002);assert.equal(covered.rollover,5004);assert.equal(covered.available,30006);assert.equal(covered.rolloverStatus,'applied')
+  const signed=weeklySummary([row(200)],budgets,'2027-02-08',{confirmations:[{weekStart:'2027-02-01',confirmedAt:'now'}]}).categories[0]
+  assert.equal(signed.available,30006)
+  const overspent=weeklySummary([row(300)],budgets,'2027-02-08',{coverage:[{from:'2027-02-01',through:'2027-02-07'}]}).categories[0]
+  assert.equal(overspent.rollover,0);assert.equal(overspent.available,25002)
+})
+test('rollover accumulates, stays under the monthly remainder, and resets next month',()=>{
+  const budgets=[{monthKey:'2027-02',bucket:'Groceries',target:1000},{monthKey:'2027-03',bucket:'Groceries',target:1000}]
+  const rows=[{date:'2027-02-03',amount:200,bucket:'Groceries',flow:'Expense'},{date:'2027-02-10',amount:250,bucket:'Groceries',flow:'Expense'}]
+  const week3=weeklySummary(rows,budgets,'2027-02-15',{coverage:[{from:'2027-02-01',through:'2027-02-14'}]}).categories[0]
+  assert.equal(week3.baseAllowance,24997);assert.equal(week3.rollover,5006);assert.equal(week3.available,30003)
+  const capped=weeklySummary([{date:'2027-02-03',amount:950,bucket:'Groceries',flow:'Expense'}],budgets,'2027-02-22',{coverage:[{from:'2027-02-01',through:'2027-02-21'}]}).categories[0]
+  assert.equal(capped.available,5000)
+  const march=weeklySummary(rows,budgets,'2027-03-01',{coverage:[{from:'2027-02-01',through:'2027-02-28'}]}).categories[0]
+  assert.equal(march.rollover,0)
+})
+test('month-opening partial weeks need coverage only for days inside that month',()=>{
+  const budgets=[{monthKey:'2026-09',bucket:'Groceries',target:300}],rows=[{date:'2026-09-02',amount:20,bucket:'Groceries',flow:'Expense'}]
+  const result=weeklySummary(rows,budgets,'2026-09-07',{coverage:[{from:'2026-09-01',through:'2026-09-06'}]}).categories[0]
+  assert.equal(result.rolloverStatus,'applied');assert.ok(result.rollover>0);assert.deepEqual(result.pendingWeeks,[])
+})
 test('covered zero-spending weeks count; partial and current weeks do not', () => {
   const rows=[{date:'2026-08-04',amount:100,flow:'Expense',bucket:'Groceries'}]
   assert.equal(weeklyBaselines(rows,[],'2026-08-31').categories[0].weekly,null)

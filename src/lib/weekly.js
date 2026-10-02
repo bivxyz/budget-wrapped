@@ -18,6 +18,7 @@ export function shiftDay(key, offset) {
 export function monday(key) {
   return shiftDay(key, -(new Date(`${key}T12:00:00`).getDay() + 6) % 7)
 }
+export const sunday = key => shiftDay(monday(key), 6)
 export const activeTransactions = rows => rows.filter(row => !row.deletedAt && !row.matchedTxnKey)
 
 // Allocate leftover cents to the first days: every month's daily shares sum exactly to its target.
@@ -26,17 +27,63 @@ export function dailyAllowance(target, key) {
   const days = new Date(year, month, 0).getDate(), total = cents(target)
   return Math.floor(total / days) + (day <= total % days ? 1 : 0)
 }
-export function weeklySummary(rows, budgets, day = dateKey()) {
+const monthEnd = month => {
+  const [year, number] = month.split('-').map(Number)
+  return `${month}-${String(new Date(year, number, 0).getDate()).padStart(2, '0')}`
+}
+const maxDate = (left, right) => left > right ? left : right
+const minDate = (left, right) => left < right ? left : right
+const everyDay = (from, through) => {
+  const days = []
+  for (let key = from; key <= through; key = shiftDay(key, 1)) days.push(key)
+  return days
+}
+export const rangeCovered = (coverage = [], from, through) => everyDay(from, through).every(day => coverage.some(range => range.from <= day && range.through >= day))
+export function weekConfirmation(start, coverage = [], confirmations = []) {
+  const weekStart = monday(start), weekEnd = shiftDay(weekStart, 6)
+  if (rangeCovered(coverage, weekStart, weekEnd)) return { confirmed: true, source: 'csv', weekStart, weekEnd }
+  const explicit = confirmations.find(row => row.weekStart === weekStart)
+  if (explicit) return { confirmed: true, source: 'sign-off', ...explicit }
+  return { confirmed: false, source: null, weekStart, weekEnd }
+}
+function priorWeekSegments(month, currentWeekStart) {
+  const startOfMonth = `${month}-01`, endOfMonth = monthEnd(month), segments = []
+  for (let weekStart = monday(startOfMonth); weekStart < currentWeekStart; weekStart = shiftDay(weekStart, 7)) {
+    const from = maxDate(weekStart, startOfMonth), through = minDate(shiftDay(weekStart, 6), endOfMonth)
+    if (from <= through) segments.push({ weekStart, from, through })
+  }
+  return segments
+}
+export function weeklySummary(rows, budgets, day = dateKey(), { coverage = [], confirmations = [] } = {}) {
   const start = monday(day), end = shiftDay(start, 6)
-  return { start, end, categories: WEEKLY_CATEGORIES.map(bucket => {
-    const transactions = activeTransactions(rows).map(effectiveTransaction).filter(row => row.flow === 'Expense' && row.bucket === bucket && row.date >= start && row.date <= end)
-    const missing = new Set(); let allowance = 0
-    for (let i = 0; i < 7; i++) {
-      const key = shiftDay(start, i), budget = budgets.find(row => row.monthKey === key.slice(0, 7) && row.bucket === bucket)
-      if (!budget) missing.add(key.slice(0, 7)); else allowance += dailyAllowance(budget.target, key)
+  const expenses = activeTransactions(rows).map(effectiveTransaction).filter(row => row.flow === 'Expense')
+  const selectedConfirmation = weekConfirmation(start, coverage, confirmations)
+  return { start, end, confirmation: selectedConfirmation, categories: WEEKLY_CATEGORIES.map(bucket => {
+    const bucketExpenses = expenses.filter(row => row.bucket === bucket)
+    const transactions = bucketExpenses.filter(row => row.date >= start && row.date <= end)
+    const missing = new Set(), pendingWeeks = new Set(), segments = []
+    let baseAllowance = 0, rollover = 0, available = 0, monthRemaining = 0
+    for (const month of [...new Set(everyDay(start, end).map(key => key.slice(0, 7)))]) {
+      const budget = budgets.find(row => row.monthKey === month && row.bucket === bucket)
+      if (!budget) { missing.add(month); continue }
+      const target = cents(budget.target), segmentFrom = maxDate(start, `${month}-01`), segmentThrough = minDate(end, monthEnd(month))
+      const segmentBase = everyDay(segmentFrom, segmentThrough).reduce((sum, key) => sum + dailyAllowance(budget.target, key), 0)
+      const priorSegments = priorWeekSegments(month, start), allConfirmed = priorSegments.every(segment => {
+        const confirmed = rangeCovered(coverage, segment.from, segment.through) || confirmations.some(row => row.weekStart === segment.weekStart)
+        if (!confirmed) pendingWeeks.add(segment.weekStart)
+        return confirmed
+      })
+      const priorSpent = bucketExpenses.filter(row => row.date >= `${month}-01` && row.date < segmentFrom).reduce((sum, row) => sum + cents(row.amount), 0)
+      const monthSpent = bucketExpenses.filter(row => row.date.startsWith(month)).reduce((sum, row) => sum + cents(row.amount), 0)
+      const earnedCarry = allConfirmed ? Math.max(0, priorSegments.reduce((sum, segment) => sum + everyDay(segment.from, segment.through).reduce((daily, key) => daily + dailyAllowance(budget.target, key), 0), 0) - priorSpent) : 0
+      const segmentAvailable = Math.min(segmentBase + earnedCarry, Math.max(0, target - priorSpent))
+      const segmentRollover = Math.max(0, segmentAvailable - segmentBase)
+      const segmentSpent = bucketExpenses.filter(row => row.date >= segmentFrom && row.date <= segmentThrough).reduce((sum, row) => sum + cents(row.amount), 0)
+      baseAllowance += segmentBase; rollover += segmentRollover; available += segmentAvailable; monthRemaining += target - monthSpent
+      segments.push({ monthKey: month, from: segmentFrom, through: segmentThrough, baseAllowance: segmentBase, rollover: segmentRollover, available: segmentAvailable, spent: segmentSpent, remaining: segmentAvailable - segmentSpent, monthRemaining: target - monthSpent, rolloverPending: priorSegments.length > 0 && !allConfirmed })
     }
-    const spent = transactions.reduce((sum, row) => sum + cents(row.amount), 0)
-    return { bucket, transactions, allowance: missing.size ? null : allowance, spent, remaining: missing.size ? null : allowance - spent, missing: [...missing] }
+    const spent = transactions.reduce((sum, row) => sum + cents(row.amount), 0), hasMissing = missing.size > 0
+    return { bucket, transactions, segments, baseAllowance: hasMissing ? null : baseAllowance, rollover: hasMissing ? null : rollover, available: hasMissing ? null : available, allowance: hasMissing ? null : available, spent, remaining: hasMissing ? null : available - spent, monthRemaining: hasMissing ? null : monthRemaining, missing: [...missing], pendingWeeks: [...pendingWeeks], rolloverStatus: hasMissing ? 'missing-budget' : pendingWeeks.size ? 'pending' : rollover > 0 ? 'applied' : 'none' }
   }) }
 }
 const median = values => {

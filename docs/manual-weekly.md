@@ -12,13 +12,45 @@ Confirm the CSV's date range only when it includes all accounts and transactions
 
 ## Weekly math
 
-- Weeks are Monday–Sunday; no rollover.
+- Weeks are Monday–Sunday. Unused confirmed allowance rolls forward inside the same calendar month and resets at the next month.
 - Each monthly target is divided across its calendar days in integer cents. Remainder cents go to the earliest days. Cross-month weeks combine both targets; if either target is absent, the week says **Budget not set**.
+- Rollover is positive-only and capped by the category's remaining monthly target. Overspending consumes earned rollover but never creates negative allowance for the next week.
+- Every earlier week segment in the month must be complete before rollover applies. A confirmed CSV covering all seven days or **Week is up to date** establishes completeness. Otherwise the current week uses only its base allowance and says rollover is pending.
 - Recommendations reserve confirmed expected income minus a default $1,000 monthly savings target and all other monthly category targets.
 - Income suggestions average up to three prior reviewed months with complete confirmed import coverage. Irregular pay must be reviewed before confirming.
 - Baselines use up to 12 completed covered weeks. Zero-spend covered weeks count. At least four weeks are needed; otherwise enter manual monthly baselines. Groceries use median weekly spending rounded up to $5; restaurants use the median. Monthly equivalents use ×52÷12.
 - Groceries receive their baseline first, then restaurants. Shortfalls require explicit adjustment; savings is never silently reduced. Extra capacity is potential additional savings, not proof of cash transferred.
 - Saving changes only the two category targets and the selected month's income/savings settings. Other targets, pacing, and order remain unchanged. The official monthly budget is recalculated from all category targets.
+
+## Private iMessage reminders
+
+The dashboard stores reminder text and delivery status in D1, but never stores the recipient's number. A signed-in Mac sends from the family's Messages identity.
+
+1. Apply migration `0008_weekly_rollover_reminders.sql` locally and remotely before deploying the new Functions.
+2. Generate a dedicated Cloudflare Access service token and add it to an Access policy for `budget.bivens.xyz`. Do not reuse a broad administrative API token.
+3. Create a separate random agent token, then set the same value as the Pages secret:
+
+   ```bash
+   npx wrangler pages secret put REMINDER_AGENT_TOKEN --project-name budget-wrapped
+   ```
+
+4. After deployment, save the recipient, Access client ID/secret, site URL, and agent token in macOS Keychain:
+
+   ```bash
+   npm run reminders:configure
+   npm run reminders:permission
+   npm run reminders:dry-run
+   ```
+
+5. Only after the dry-run text is correct, install the two user launch agents:
+
+   ```bash
+   npm run reminders:install
+   ```
+
+The weekly agent runs Monday at 9:00 AM in `America/Los_Angeles`. If the Mac wakes late, it sends within a 24-hour grace period. The polling agent checks dashboard-queued messages about once per minute. Messages failures remain visible in Overview and require an explicit retry. Remove both jobs with `npm run reminders:uninstall`; Keychain settings are retained.
+
+Launch-agent logs contain only queue IDs and statuses under `~/Library/Logs/BudgetWrapped`. A local delivery ledger under `~/Library/Application Support/Budget Wrapped` prevents an uncertain restart from silently sending a duplicate.
 
 ## Rollout
 
@@ -28,6 +60,6 @@ Requires Node 22.13+ (Node 24 recommended) for the SQLite-backed tests. No new r
 2. Check pending local migrations with `npx wrangler d1 migrations list DB --local`, then apply with `npx wrangler d1 migrations apply DB --local`.
 3. Compile Pages Functions with `npx wrangler pages functions build --outdir .wrangler/functions-check`.
 4. Test locally with `npx wrangler pages dev dist --compatibility-date 2026-08-06` (the date supported by the installed runtime; use the project's supported date after upgrading).
-5. Before production deployment, explicitly apply **0006_manual_weekly.sql** to the production DB using the migration registry. Confirm only expected migrations are pending. This implementation does not apply remote migrations or push/deploy code.
+5. Before production deployment, confirm the migration registry and explicitly apply all pending migrations, including **0008_weekly_rollover_reminders.sql**, to the production DB. Deploy the web app before installing the local sender.
 
 Keep Cloudflare Access covering the custom domain, API routes, and any reachable Pages aliases. D1 data, local database files, CSVs, and configuration remain private and outside source control. Do not deploy the new API before its migration: it requires the new columns and tables.

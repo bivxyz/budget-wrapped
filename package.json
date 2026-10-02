@@ -9,6 +9,11 @@
     "preview": "vite preview",
     "test": "node --test",
     "ingest": "node scripts/ingest.mjs",
+    "reminders:configure": "node scripts/imessage-reminders.mjs configure",
+    "reminders:permission": "node scripts/imessage-reminders.mjs permission-check",
+    "reminders:install": "node scripts/imessage-reminders.mjs install",
+    "reminders:uninstall": "node scripts/imessage-reminders.mjs uninstall",
+    "reminders:dry-run": "node scripts/imessage-reminders.mjs dry-run",
     "dev:shared": "npm run build && wrangler pages dev dist",
     "deploy": "npm run build && wrangler pages deploy dist"
   },

@@ -8,6 +8,7 @@ A private shared family budget tracker built around Rocket Money CSV exports. It
 2. Open the selected month and upload the CSV. Repeated YTD uploads are safe and refresh imported fields without removing app overrides.
 3. Review uncategorized or edited rows, adjust category and flow type, and update that month's budgets.
 4. Use the top-five expenses, top-three categories, pacing, trends, and Wrapped replay to review the month together.
+5. Use the weekly grocery and dining envelopes. Confirm completed weeks to carry unused allowance forward, and use the private Monday iMessage reminder as a short family check-in.
 
 Corrections affect Budget Wrapped only; they do not sync back to Rocket Money. The original Rocket Money category remains visible in the tracking table.
 
@@ -49,6 +50,8 @@ npm run deploy
 ```
 
 Set the production D1 binding name to `DB`. Direct-upload builds keep transaction files out of git. The `data/` archive, local Wrangler configuration/state, and production identifiers are gitignored. `robots.txt` and page metadata prohibit indexing; Cloudflare Access is the security boundary.
+
+The optional iMessage sender runs locally on the signed-in Mac and uses a dedicated Cloudflare Access service token. Its recipient number and credentials live in macOS Keychain, never in D1 or source control. See [`docs/manual-weekly.md`](docs/manual-weekly.md) for migration, dry-run, installation, and removal instructions.
 
 ## Original single-month flow
 

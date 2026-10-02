@@ -1,0 +1,55 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { DatabaseSync } from 'node:sqlite'
+import { readFileSync, readdirSync } from 'node:fs'
+import { composeWeeklyReminder, cutbackPreview } from '../src/lib/reminders.js'
+import { weeklySummary } from '../src/lib/weekly.js'
+import { onRequestPost as reminders } from '../functions/api/reminders.js'
+import { onRequestPost as confirmWeek } from '../functions/api/weekly-confirmation.js'
+import { onRequestGet as state } from '../functions/api/state.js'
+
+function database() {
+  const sqlite = new DatabaseSync(':memory:')
+  for (const name of readdirSync(new URL('../migrations/', import.meta.url)).sort()) sqlite.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8'))
+  return { sqlite, prepare(sql) { let params=[]; return { bind(...values){params=values;return this}, first:async()=>sqlite.prepare(sql).get(...params)||null, all:async()=>({results:sqlite.prepare(sql).all(...params)}), run:async()=>{const result=sqlite.prepare(sql).run(...params);return{meta:{changes:Number(result.changes),last_row_id:Number(result.lastInsertRowid)}}} } }, batch:async statements=>{sqlite.exec('BEGIN');try{const result=[];for(const statement of statements)result.push(await statement.run());sqlite.exec('COMMIT');return result}catch(error){sqlite.exec('ROLLBACK');throw error}} }
+}
+const call = async (handler, DB, body, token) => { const response=await handler({env:{DB,REMINDER_AGENT_TOKEN:'agent-secret'},request:new Request('https://example.test/api',{method:'POST',headers:{'content-type':'application/json',...(token?{'X-Budget-Reminder-Token':token}:{})},body:JSON.stringify(body)})}); return {httpStatus:response.status,...await response.json()} }
+
+test('weekly reminder explains rollover and stale data',()=>{
+  const budgets=[{monthKey:'2027-02',bucket:'Groceries',target:1000},{monthKey:'2027-02',bucket:'Restaurants/Fast Food',target:400}],row={date:'2027-02-03',amount:200,bucket:'Groceries',flow:'Expense'}
+  const applied=composeWeeklyReminder(weeklySummary([row],budgets,'2027-02-08',{coverage:[{from:'2027-02-01',through:'2027-02-07'}]}))
+  assert.match(applied.text,/\$300\.06/);assert.match(applied.text,/\$50\.04 rollover/)
+  const stale=composeWeeklyReminder(weeklySummary([row],budgets,'2027-02-08'))
+  assert.match(stale.text,/rollover pending/);assert.match(stale.text,/Update or confirm last week/)
+})
+test('cutback preview ranks variable risks, excludes fixed expenses, and handles a healthy month',()=>{
+  const rows=[{date:'2026-10-10',amount:90,bucket:'Groceries',flow:'Expense'},{date:'2026-10-10',amount:5000,bucket:'Fixed Expenses',flow:'Expense'}],budgets=[{monthKey:'2026-10',bucket:'Groceries',target:100},{monthKey:'2026-10',bucket:'Fixed Expenses',target:5000}]
+  const result=cutbackPreview({monthKey:'2026-10',rows,budgets,savingsSetting:{income:500000,savings:100000},asOf:'2026-10-15'})
+  assert.equal(result.canSend,true);assert.deepEqual(result.risks.map(row=>row.bucket),['Groceries']);assert.match(result.text,/Projected savings/)
+  assert.equal(cutbackPreview({monthKey:'2026-10',rows:[],budgets,asOf:'2026-10-15'}).canSend,false)
+})
+test('week confirmation is shared and can be reopened',async()=>{
+  const db=database(),confirmed=await call(confirmWeek,db,{action:'confirm',weekStart:'2020-01-06'})
+  assert.equal(confirmed.httpStatus,200)
+  let shared=await (await state({env:{DB:db}})).json();assert.equal(shared.weeklyConfirmations[0].weekStart,'2020-01-06')
+  assert.equal((await call(confirmWeek,db,{action:'reopen',weekStart:'2020-01-06'})).httpStatus,200)
+  shared=await (await state({env:{DB:db}})).json();assert.equal(shared.weeklyConfirmations.length,0)
+})
+test('reminder outbox is idempotent, agent protected, and records delivery',async()=>{
+  const db=database();db.sqlite.exec(`INSERT INTO monthly_budgets(month_key,bucket,target,paced,updated_at,updated_by,sort_order) VALUES('2026-10','Groceries',100,1,'now','test',0);
+    INSERT INTO monthly_savings_settings VALUES('2026-10',500000,100000,0,0,'now','test');
+    INSERT INTO transactions(txn_key,date,amount,name,bucket,account,is_income,uploaded_at,uploaded_by,source,imported_flow) VALUES('t','2026-10-10',90,'Market','Groceries','Card',0,'now','test','import','Expense');`)
+  const body={action:'queue',kind:'cutback',monthKey:'2026-10',clientId:'12345678-1234-1234-1234-123456789012'}
+  const first=await call(reminders,db,body),second=await call(reminders,db,body)
+  assert.equal(first.httpStatus,200);assert.equal(second.item.id,first.item.id);assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM message_outbox').get().count,1)
+  assert.equal((await call(reminders,db,{action:'claim'},'wrong')).httpStatus,403)
+  const claimed=await call(reminders,db,{action:'claim'},'agent-secret');assert.equal(claimed.item.id,first.item.id)
+  assert.equal((await call(reminders,db,{action:'complete',id:claimed.item.id,claimToken:claimed.item.claimToken},'agent-secret')).httpStatus,200)
+  assert.equal(db.sqlite.prepare('SELECT status FROM message_outbox').get().status,'sent')
+})
+test('automatic weekly reminders deduplicate by week',async()=>{
+  const db=database();db.sqlite.exec("INSERT INTO monthly_budgets(month_key,bucket,target,paced,updated_at,updated_by,sort_order) VALUES('2027-02','Groceries',1000,1,'now','test',0),('2027-02','Restaurants/Fast Food',400,1,'now','test',1)")
+  const body={action:'automatic',weekStart:'2027-02-08'}
+  await call(reminders,db,body,'agent-secret');await call(reminders,db,body,'agent-secret')
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM message_outbox').get().count,1)
+})
