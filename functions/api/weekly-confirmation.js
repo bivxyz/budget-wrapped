@@ -1,5 +1,5 @@
 import { actor, json, requireDb } from './_utils.js'
-import { monday, shiftDay, validDate } from '../../src/lib/weekly.js'
+import { monday, shiftDay, validDate, weekCanBeConfirmed } from '../../src/lib/weekly.js'
 
 const pacificDateKey = () => {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
@@ -12,7 +12,7 @@ export async function onRequestPost({ request, env }) {
     const db = requireDb(env), body = await request.json(), weekStart = String(body.weekStart || '')
     if (!validDate(weekStart) || monday(weekStart) !== weekStart) return json({ error: 'Choose a valid Monday.' }, 400)
     const weekEnd = shiftDay(weekStart, 6)
-    if (weekEnd >= pacificDateKey()) return json({ error: 'A week can only be confirmed after Sunday has ended.' }, 409)
+    if (!weekCanBeConfirmed(weekEnd, pacificDateKey())) return json({ error: 'A week can only be confirmed on or after Sunday.' }, 409)
     if (body.action === 'reopen') {
       const result = await db.prepare('DELETE FROM weekly_confirmations WHERE week_start=?').bind(weekStart).run()
       if (!result.meta.changes) return json({ error: 'This week does not have a manual confirmation.' }, 409)

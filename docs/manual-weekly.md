@@ -15,7 +15,7 @@ Confirm the CSV's date range only when it includes all accounts and transactions
 - Weeks are Monday–Sunday. Unused confirmed allowance rolls forward inside the same calendar month and resets at the next month.
 - Each monthly target is divided across its calendar days in integer cents. Remainder cents go to the earliest days. Cross-month weeks combine both targets; if either target is absent, the week says **Budget not set**.
 - Rollover is positive-only and capped by the category's remaining monthly target. Overspending consumes earned rollover but never creates negative allowance for the next week.
-- Every earlier week segment in the month must be complete before rollover applies. A confirmed CSV covering all seven days or **Week is up to date** establishes completeness. Otherwise the current week uses only its base allowance and says rollover is pending.
+- Every earlier week segment in the month must be complete before rollover applies. A confirmed CSV covering all seven days or the Sunday **Sunday update complete** sign-off establishes completeness. Otherwise the current week uses only its base allowance and says rollover is pending.
 - Recommendations reserve confirmed expected income minus a default $1,000 monthly savings target and all other monthly category targets.
 - Income suggestions average up to three prior reviewed months with complete confirmed import coverage. Irregular pay must be reviewed before confirming.
 - Baselines use up to 12 completed covered weeks. Zero-spend covered weeks count. At least four weeks are needed; otherwise enter manual monthly baselines. Groceries use median weekly spending rounded up to $5; restaurants use the median. Monthly equivalents use ×52÷12.

@@ -129,6 +129,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--color-acc
 .savings-goal-panel { padding: clamp(1rem,2.2vw,1.6rem); border-color: rgba(0,255,135,.2); background: linear-gradient(135deg,rgba(0,255,135,.07),var(--color-base-2) 44%); }
 .savings-goal-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .savings-goal-heading p { margin-top: .35rem; font-size: .82rem; }
+.answer-plan-action { margin-top: .75rem; }
 .savings-goal-icon { font-size: 1.8rem; }
 .savings-goal-grid { display: grid; grid-template-columns: 1.35fr repeat(4,minmax(0,1fr)); gap: 1px; margin-top: 1.1rem; overflow: hidden; border: 1px solid rgba(255,255,255,.08); border-radius: .7rem; background: rgba(255,255,255,.08); }
 .savings-goal-hero,.savings-stat { min-width: 0; background: #13161e; padding: .85rem; }

@@ -19,6 +19,7 @@ export function monday(key) {
   return shiftDay(key, -(new Date(`${key}T12:00:00`).getDay() + 6) % 7)
 }
 export const sunday = key => shiftDay(monday(key), 6)
+export const weekCanBeConfirmed = (weekEnd, today = dateKey()) => weekEnd <= today
 export const activeTransactions = rows => rows.filter(row => !row.deletedAt && !row.matchedTxnKey)
 
 // Allocate leftover cents to the first days: every month's daily shares sum exactly to its target.
@@ -116,10 +117,19 @@ export function previousMonthWeekly(rows, coverage, month) {
   }) }
 }
 export function incomeSuggestion(rows, reviews, asOf = dateKey(), coverage = []) {
-  const months = reviews.filter(row => row.reviewedAt && row.monthKey < asOf.slice(0, 7) && Array.from({length:new Date(Number(row.monthKey.slice(0,4)),Number(row.monthKey.slice(5)),0).getDate()},(_,index)=>shiftDay(`${row.monthKey}-01`,index)).every(day=>coverage.some(range=>range.from<=day&&range.through>=day)) && rows.some(t => t.source !== 'manual' && t.date.startsWith(row.monthKey))).map(row => row.monthKey).sort().slice(-3)
-  if (!months.length) return { months, amount: null }
-  const income = activeTransactions(rows).map(effectiveTransaction).filter(row => row.flow === 'Income' && months.includes(row.date.slice(0, 7))).reduce((sum, row) => sum + Math.max(0, -cents(row.amount)), 0)
-  return { months, amount: Math.round(income / months.length) }
+  const before = asOf.slice(0, 7)
+  const incomeRows = activeTransactions(rows).map(effectiveTransaction).filter(row => row.flow === 'Income' && row.source !== 'manual' && row.date.slice(0, 7) < before)
+  const available = [...new Set(incomeRows.map(row => row.date.slice(0, 7)))].filter(month => incomeRows.some(row => row.date.startsWith(month) && Math.max(0, -cents(row.amount)) > 0)).sort()
+  const reviewed = reviews.filter(row => row.reviewedAt && row.monthKey < before && available.includes(row.monthKey) && Array.from({ length: new Date(Number(row.monthKey.slice(0, 4)), Number(row.monthKey.slice(5)), 0).getDate() }, (_, index) => shiftDay(`${row.monthKey}-01`, index)).every(day => coverage.some(range => range.from <= day && range.through >= day))).map(row => row.monthKey).sort()
+  const basis = reviewed.length ? 'reviewed-complete' : available.length ? 'available-history' : null
+  const months = (reviewed.length ? reviewed : available).slice(-3)
+  if (!months.length) return { months, amount: null, basis }
+  const totals = months.map(month => incomeRows.filter(row => row.date.startsWith(month)).reduce((sum, row) => sum + Math.max(0, -cents(row.amount)), 0))
+  return { months, amount: median(totals), basis }
+}
+export function expectedIncome(settings = [], month, suggestion = { amount: null, months: [], basis: null }) {
+  const prior = settings.filter(row => row.monthKey < month && Number(row.income) > 0).sort((left, right) => left.monthKey.localeCompare(right.monthKey)).at(-1)
+  return prior ? { amount: Number(prior.income), months: [prior.monthKey], basis: 'prior-plan' } : suggestion
 }
 export function recommendWeekly({ income, savings, other, groceries, restaurants }) {
   const available = income - savings - other

@@ -1,16 +1,18 @@
 import { useEffect,useMemo,useState } from 'react'
 import { formatCurrency } from '../lib/finance.js'
-import { cents,dateKey,dollars,incomeSuggestion,savingsPosition } from '../lib/weekly.js'
+import { cents,dateKey,dollars,expectedIncome,incomeSuggestion,savingsPosition } from '../lib/weekly.js'
 import { postJson } from '../lib/sharedState.js'
 
 const money=value=>formatCurrency(dollars(value),{cents:true})
 const labelMonth=key=>new Date(`${key}-01T12:00:00`).toLocaleDateString('en-US',{month:'long',year:'numeric'})
 const snapshot=form=>JSON.stringify({income:String(form.income),savings:String(form.savings)})
+const predictionCopy=prediction=>prediction?.basis==='prior-plan'?`Carried forward from the saved ${labelMonth(prediction.months[0])} income plan.`:prediction?.basis==='reviewed-complete'?`Median take-home income from reviewed, complete months: ${prediction.months.join(', ')}.`:prediction?.basis==='available-history'?`Estimated from the median imported income in ${prediction.months.join(', ')}. Confirm before saving.`:''
 
 export default function SavingsGoal({month,monthly,shared,closed,onChanged,onDirtyChange}){
   const saved=(shared.savingsSettings||[]).find(row=>row.monthKey===month)
   const suggestion=useMemo(()=>incomeSuggestion(shared.transactions||[],shared.monthlyReviews||[],`${month}-01`,shared.importCoverage||[]),[shared.transactions,shared.monthlyReviews,shared.importCoverage,month])
-  const initial=useMemo(()=>({income:saved?dollars(saved.income):suggestion.amount==null?'':dollars(suggestion.amount),savings:saved?dollars(saved.savings):1000}),[saved,suggestion.amount])
+  const prediction=useMemo(()=>expectedIncome(shared.savingsSettings||[],month,suggestion),[shared.savingsSettings,month,suggestion])
+  const initial=useMemo(()=>({income:saved?dollars(saved.income):prediction.amount==null?'':dollars(prediction.amount),savings:saved?dollars(saved.savings):1000}),[saved,prediction.amount])
   const [form,setForm]=useState(initial),[baseline,setBaseline]=useState(saved?snapshot(initial):snapshot({income:'',savings:1000})),[touched,setTouched]=useState(false),[confirmed,setConfirmed]=useState(Boolean(saved)),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
   useEffect(()=>{setForm(initial);setBaseline(saved?snapshot(initial):snapshot({income:'',savings:1000}));setTouched(false);setConfirmed(Boolean(saved));setError('');setNotice('')},[month,initial,saved])
   const dirty=snapshot(form)!==baseline
@@ -23,7 +25,7 @@ export default function SavingsGoal({month,monthly,shared,closed,onChanged,onDir
     <div className="savings-goal-grid"><div className="savings-goal-hero"><span>{closed?'Saved goal':'Monthly goal'}</span><strong>{formatCurrency(Number(form.savings)||0)}</strong><small>{labelMonth(month)}</small></div><SavingsStat label="Expected income" value={income==null?null:income}/><SavingsStat label="Available to spend" value={position?.spendable} hot={position?.spendable<0}/><SavingsStat label="Category budgets" value={cents(monthly.budgetTotal)}/><SavingsStat label={closed?'Actual savings / loss':'Projected savings'} value={closed?cents(monthly.savingsLoss):position?.projected} hot={closed?closedDifference<0:position?.projected<0}/></div>
     {closed&&saved?<div className={`savings-capacity ${closedDifference<0?'savings-capacity-warning':''}`}><strong>{closedDifference<0?`${money(-closedDifference)} below the savings goal`:`${money(closedDifference)} above the savings goal`}</strong><span>Income minus true spending and investment contributions, compared with the saved goal.</span></div>:position&&<div className={`savings-capacity ${position.shortfall?'savings-capacity-warning':''}`}><strong>{position.shortfall?`${money(position.shortfall)} savings-goal shortfall`:`${money(position.extra)} potential additional savings`}</strong><span>{position.shortfall?'The category plan spends beyond income after the goal. You can still save it, but the tradeoff stays visible.':'Income left after the savings goal and every category budget. This is potential—not money already transferred.'}</span></div>}
     {!closed&&<form onSubmit={save} className="savings-goal-form"><MoneyInput label="Expected monthly take-home income" value={form.income} onChange={value=>update('income',value)}/><MoneyInput label="Monthly savings goal" value={form.savings} onChange={value=>update('savings',value)}/><label className="check-row savings-confirm"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>I confirm this expected income for {labelMonth(month)}.</label><button className="primary-button" disabled={busy||!dirty||!confirmed||form.income===''}>{busy?'Saving…':'Save savings goal'}</button></form>}
-    {!saved&&suggestion.amount!=null&&<p className="planner-help">Suggested income: {money(suggestion.amount)}, averaged from {suggestion.months.join(', ')}. Confirm it before saving.</p>}{error&&<p role="alert" className="panel-error">{error}</p>}{notice&&<p role="status" className={position?.shortfall?'panel-warning':'panel-success'}>{notice}</p>}
+    {!saved&&prediction.amount!=null&&<p className="planner-help"><strong>Predicted income: {money(prediction.amount)}.</strong> {predictionCopy(prediction)}</p>}{error&&<p role="alert" className="panel-error">{error}</p>}{notice&&<p role="status" className={position?.shortfall?'panel-warning':'panel-success'}>{notice}</p>}
   </section>
 }
 

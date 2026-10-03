@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cents, dailyAllowance, incomeSuggestion, monday, monthlyFromWeekly, previousMonthWeekly, recommendWeekly, savingsPosition, weeklyBaselines, weeklyFromMonthly, weeklySummary } from '../src/lib/weekly.js'
+import { cents, dailyAllowance, expectedIncome, incomeSuggestion, monday, monthlyFromWeekly, previousMonthWeekly, recommendWeekly, savingsPosition, weekCanBeConfirmed, weeklyBaselines, weeklyFromMonthly, weeklySummary } from '../src/lib/weekly.js'
 import { matchSuggestions } from '../src/lib/reconciliation.js'
 import { monthlySummary } from '../src/lib/tracker.js'
 
@@ -9,6 +9,8 @@ test('daily cent allocation reconciles each calendar month including leap Februa
     assert.equal(Array.from({ length: days }, (_, i) => dailyAllowance(123.47, `${month}-${String(i+1).padStart(2,'0')}`)).reduce((a,b)=>a+b,0),12347)
   }
   assert.equal(monday('2027-01-01'),'2026-12-28')
+  assert.equal(weekCanBeConfirmed('2026-10-04','2026-10-04'),true)
+  assert.equal(weekCanBeConfirmed('2026-10-04','2026-10-03'),false)
 })
 test('cross-month allowances require both targets and spending uses active expense rows', () => {
   const budgets=[{monthKey:'2026-08',bucket:'Groceries',target:310},{monthKey:'2026-09',bucket:'Groceries',target:600}]
@@ -88,10 +90,12 @@ test('manual spending affects savings or loss but never imported coverage; audit
   assert.equal(result.totalSpent,10);assert.equal(result.netProfit,-10);assert.equal(result.coverageThrough,null);assert.equal(result.fullMonthData,false)
 })
 
-test('income suggestions require reviewed complete imported months and ignore transfers',()=>{
+test('income predictions prefer reviewed months, fall back to imported history, and carry saved plans forward',()=>{
   const rows=[{date:'2026-07-01',amount:-4000,flow:'Income'},{date:'2026-08-01',amount:-5000,flow:'Income'},{date:'2026-08-04',amount:-20000,flow:'Transfer'}]
   const reviews=[{monthKey:'2026-07',reviewedAt:'yes'},{monthKey:'2026-08',reviewedAt:'yes'}]
-  assert.equal(incomeSuggestion(rows,reviews,'2026-09-01').amount,null)
-  assert.equal(incomeSuggestion(rows,reviews,'2026-09-01',[{from:'2026-07-01',through:'2026-08-31'}]).amount,450000)
-  assert.equal(incomeSuggestion(rows,reviews,'2026-09-01',[{from:'2026-08-01',through:'2026-08-30'}]).amount,null)
+  const fallback=incomeSuggestion(rows,reviews,'2026-09-01');assert.equal(fallback.amount,450000);assert.equal(fallback.basis,'available-history')
+  const reviewed=incomeSuggestion(rows,reviews,'2026-09-01',[{from:'2026-07-01',through:'2026-08-31'}]);assert.equal(reviewed.amount,450000);assert.equal(reviewed.basis,'reviewed-complete')
+  const partial=incomeSuggestion(rows,reviews,'2026-09-01',[{from:'2026-08-01',through:'2026-08-30'}]);assert.equal(partial.amount,450000);assert.equal(partial.basis,'available-history')
+  const carried=expectedIncome([{monthKey:'2026-08',income:475000}], '2026-09', fallback);assert.deepEqual(carried,{amount:475000,months:['2026-08'],basis:'prior-plan'})
+  const medianResult=incomeSuggestion([...rows,{date:'2026-06-01',amount:-20000,flow:'Income'}],[],'2026-09-01');assert.equal(medianResult.amount,500000)
 })
