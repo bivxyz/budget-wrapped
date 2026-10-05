@@ -464,7 +464,11 @@ button.audit-row:hover,button.audit-excluded-row:hover:not(:disabled) { border-r
 .quick-expense-empty { margin-top: .7rem; color: rgba(255,255,255,.32) !important; font-size: .68rem; }
 .quick-expense-list { margin-top: .7rem; border-top: 1px solid rgba(255,255,255,.075); }
 .quick-expense-list-head { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .65rem .75rem; font-size: .72rem; }
-.quick-expense-list-head span { color: var(--color-accent-sky); font-variant-numeric: tabular-nums; font-weight: 800; }
+.quick-expense-list-controls { display: flex; align-items: center; gap: .75rem; }
+.quick-expense-list-controls label { display: flex; align-items: center; gap: .45rem; color: rgba(255,255,255,.38); font-size: .6rem; font-weight: 700; }
+.quick-expense-list-controls .field { min-height: 34px; padding: .35rem .55rem; font-size: .68rem; }
+.quick-expense-total { min-width: 72px; color: var(--color-accent-sky); font-variant-numeric: tabular-nums; text-align: right; }
+.quick-expense-filter-empty { border-top: 1px solid rgba(255,255,255,.07); padding: .8rem .75rem; color: rgba(255,255,255,.34) !important; font-size: .68rem; }
 .quick-expense-list ol { max-height: 290px; overflow-y: auto; border-top: 1px solid rgba(255,255,255,.07); }
 .quick-expense-list li { display: grid; grid-template-columns: 62px minmax(0,1fr) auto auto; align-items: center; gap: .75rem; border-top: 1px solid rgba(255,255,255,.055); padding: .58rem .75rem; font-size: .7rem; }
 .quick-expense-list li:first-child { border-top: 0; }
@@ -600,6 +604,10 @@ button.audit-row:hover,button.audit-excluded-row:hover:not(:disabled) { border-r
   .quick-expense-save,.quick-expense-form > .secondary-button { margin-top: 0; }
   .quick-expense-list li { grid-template-columns: 52px minmax(0,1fr) auto; }
   .quick-expense-actions { grid-column: 2/4; }
+  .quick-expense-list-head { align-items: stretch; flex-direction: column; }
+  .quick-expense-list-controls { justify-content: space-between; }
+  .quick-expense-list-controls label { flex: 1; }
+  .quick-expense-list-controls .field { width: 100%; }
   .week-signoff { align-items: stretch; flex-direction: column; }
   .focused-budget-link { align-items: stretch; flex-direction: column; }
   .focused-budget-link button { width: 100%; min-height: 44px; }
