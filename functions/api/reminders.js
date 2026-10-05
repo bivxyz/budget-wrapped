@@ -1,5 +1,5 @@
 import { actor, json, requireDb } from './_utils.js'
-import { composeWeeklyReminder, composeWeeklySpending, cutbackPreview, manualReminderKey, MESSAGE_CATEGORIES } from '../../src/lib/reminders.js'
+import { BUDGET_MESSAGE_CATEGORIES, composeWeeklyReminder, composeWeeklySpending, cutbackPreview, manualReminderKey, SPENDING_MESSAGE_CATEGORIES } from '../../src/lib/reminders.js'
 import { monday, validDate, validMonth, weekConfirmation, weeklySummary } from '../../src/lib/weekly.js'
 
 const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i
@@ -42,13 +42,13 @@ async function preview(db, body) {
     const weekStart = String(body.weekStart || ''), confirmationWeekStart = String(body.confirmationWeekStart || '')
     if (!validDate(weekStart) || monday(weekStart) !== weekStart) throw new Error('Choose a valid reminder week.')
     if (!validDate(confirmationWeekStart) || monday(confirmationWeekStart) !== confirmationWeekStart || !weekConfirmation(confirmationWeekStart, data.coverage, data.confirmations).confirmed) throw new Error('Confirm the completed week before sending the new budget.')
-    return { ...composeWeeklyReminder(weeklySummary(data.transactions, data.budgets, weekStart, { coverage: data.coverage, confirmations: data.confirmations, categories: MESSAGE_CATEGORIES.map(row => row.bucket) })), periodKey: weekStart }
+    return { ...composeWeeklyReminder(weeklySummary(data.transactions, data.budgets, weekStart, { coverage: data.coverage, confirmations: data.confirmations, categories: BUDGET_MESSAGE_CATEGORIES.map(row => row.bucket) })), periodKey: weekStart }
   }
   if (body.kind === 'weekly-spend') {
     const weekStart = String(body.weekStart || '')
     if (!validDate(weekStart) || monday(weekStart) !== weekStart) throw new Error('Choose a valid spending week.')
     if (!weekConfirmation(weekStart, data.coverage, data.confirmations).confirmed) throw new Error('Confirm the completed week before sending its spending recap.')
-    return { ...composeWeeklySpending(weeklySummary(data.transactions, data.budgets, weekStart, { coverage: data.coverage, confirmations: data.confirmations, categories: MESSAGE_CATEGORIES.map(row => row.bucket) })), periodKey: weekStart }
+    return { ...composeWeeklySpending(weeklySummary(data.transactions, data.budgets, weekStart, { coverage: data.coverage, confirmations: data.confirmations, categories: SPENDING_MESSAGE_CATEGORIES.map(row => row.bucket) })), periodKey: weekStart }
   }
   if (body.kind === 'cutback') {
     const monthKey = String(body.monthKey || '')

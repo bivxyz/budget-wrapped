@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DatabaseSync } from 'node:sqlite'
 import { readFileSync, readdirSync } from 'node:fs'
-import { composeWeeklyReminder, composeWeeklySpending, cutbackPreview, MESSAGE_CATEGORIES } from '../src/lib/reminders.js'
+import { BUDGET_MESSAGE_CATEGORIES, composeWeeklyReminder, composeWeeklySpending, cutbackPreview, SPENDING_MESSAGE_CATEGORIES } from '../src/lib/reminders.js'
 import { weeklySummary } from '../src/lib/weekly.js'
 import { onRequestPost as reminders } from '../functions/api/reminders.js'
 import { onRequestPost as confirmWeek } from '../functions/api/weekly-confirmation.js'
@@ -17,11 +17,11 @@ const call = async (handler, DB, body, token) => { const response=await handler(
 
 test('weekly reminder uses concise emoji lines and slash-formatted dates',()=>{
   const budgets=[{monthKey:'2027-02',bucket:'Groceries',target:1000},{monthKey:'2027-02',bucket:'Restaurants/Fast Food',target:400},{monthKey:'2027-02',bucket:'Shopping/Gifts',target:280}],rows=[{date:'2027-02-09',amount:200,name:'Market',bucket:'Groceries',flow:'Expense'},{date:'2027-02-10',amount:40,name:'Cafe',bucket:'Restaurants/Fast Food',flow:'Expense'},{date:'2027-02-11',amount:60,name:'Target',bucket:'Shopping/Gifts',flow:'Expense'}]
-  const summary=weeklySummary(rows,budgets,'2027-02-08',{categories:MESSAGE_CATEGORIES.map(row=>row.bucket)})
-  const budget=composeWeeklyReminder(summary)
-  assert.equal(budget.text,'Budget this week (02/08–02/14):\n🛒 Groceries: $250.02\n🍽️ Dining: $100.03\n🛍️ Shopping: $70')
-  assert.equal(composeWeeklySpending(summary).text,'Spent last week (02/08–02/14):\n🛒 Groceries: $200\n🍽️ Dining: $40\n🛍️ Shopping: $60\n💸 Biggest: Market — $200')
-  assert.equal(composeWeeklyReminder(weeklySummary(rows,budgets.slice(0,2),'2027-02-08',{categories:MESSAGE_CATEGORIES.map(row=>row.bucket)})).canSend,false)
+  const budgetSummary=weeklySummary(rows,budgets,'2027-02-08',{categories:BUDGET_MESSAGE_CATEGORIES.map(row=>row.bucket)}),spendingSummary=weeklySummary(rows,budgets,'2027-02-08',{categories:SPENDING_MESSAGE_CATEGORIES.map(row=>row.bucket)})
+  const budget=composeWeeklyReminder(budgetSummary)
+  assert.equal(budget.text,'Budget this week (02/08–02/14):\n🛒 Groceries: $250.02\n🍽️ Dining: $100.03')
+  assert.equal(composeWeeklySpending(spendingSummary).text,'Spent last week (02/08–02/14):\n🛒 Groceries: $200\n🍽️ Dining: $40\n🛍️ Shopping: $60\n💸 Biggest: Market — $200')
+  assert.equal(composeWeeklyReminder(weeklySummary(rows,budgets.slice(0,1),'2027-02-08',{categories:BUDGET_MESSAGE_CATEGORIES.map(row=>row.bucket)})).canSend,false)
 })
 test('cutback preview ranks variable risks, excludes fixed expenses, and handles a healthy month',()=>{
   const rows=[{date:'2026-10-10',amount:90,bucket:'Groceries',flow:'Expense'},{date:'2026-10-10',amount:5000,bucket:'Fixed Expenses',flow:'Expense'}],budgets=[{monthKey:'2026-10',bucket:'Groceries',target:100},{monthKey:'2026-10',bucket:'Fixed Expenses',target:5000}]

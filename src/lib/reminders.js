@@ -4,22 +4,26 @@ import { effectiveTransaction } from './tracker.js'
 const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: Number(value) % 100 ? 2 : 0 }).format(dollars(value))
 const shortMonth = key => new Date(`${key}-01T12:00:00`).toLocaleDateString('en-US', { month: 'short' })
 const normalize = value => String(value || '').trim().toLowerCase()
-export const MESSAGE_CATEGORIES = [
+export const BUDGET_MESSAGE_CATEGORIES = [
   { bucket: 'Groceries', label: 'Groceries', icon: '🛒' },
   { bucket: 'Restaurants/Fast Food', label: 'Dining', icon: '🍽️' },
+]
+export const SPENDING_MESSAGE_CATEGORIES = [
+  ...BUDGET_MESSAGE_CATEGORIES,
   { bucket: 'Shopping/Gifts', label: 'Shopping', icon: '🛍️' },
 ]
+export const MESSAGE_CATEGORIES = SPENDING_MESSAGE_CATEGORIES
 const messageDates = summary => {
   const date = value => value.slice(5).replace('-', '/')
   return `${date(summary.start)}–${date(summary.end)}`
 }
 
 export function composeWeeklyReminder(summary) {
-  const lines = MESSAGE_CATEGORIES.map(meta => {
+  const lines = BUDGET_MESSAGE_CATEGORIES.map(meta => {
     const category = summary.categories.find(row => row.bucket === meta.bucket)
     return `${meta.icon} ${meta.label}: ${category?.available == null ? 'Budget not set' : money(category.available)}`
   })
-  const missing = MESSAGE_CATEGORIES.filter(meta => summary.categories.find(row => row.bucket === meta.bucket)?.available == null).map(row => row.label)
+  const missing = BUDGET_MESSAGE_CATEGORIES.filter(meta => summary.categories.find(row => row.bucket === meta.bucket)?.available == null).map(row => row.label)
   return {
     kind: 'weekly', canSend: missing.length === 0, missing,
     text: `Budget this week (${messageDates(summary)}):\n${lines.join('\n')}`,
@@ -27,9 +31,9 @@ export function composeWeeklyReminder(summary) {
 }
 
 export function composeWeeklySpending(summary) {
-  const rows = MESSAGE_CATEGORIES.flatMap(meta => (summary.categories.find(row => row.bucket === meta.bucket)?.transactions || []).map(row => ({ ...row, messageCategory: meta })))
+  const rows = SPENDING_MESSAGE_CATEGORIES.flatMap(meta => (summary.categories.find(row => row.bucket === meta.bucket)?.transactions || []).map(row => ({ ...row, messageCategory: meta })))
   const biggest = rows.filter(row => cents(row.amount) > 0).sort((left, right) => cents(right.amount) - cents(left.amount) || left.date.localeCompare(right.date))[0]
-  const lines = MESSAGE_CATEGORIES.map(meta => {
+  const lines = SPENDING_MESSAGE_CATEGORIES.map(meta => {
     const category = summary.categories.find(row => row.bucket === meta.bucket)
     return `${meta.icon} ${meta.label}: ${money(category?.spent || 0)}`
   })
