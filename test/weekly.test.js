@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cents, dailyAllowance, expectedIncome, incomeSuggestion, monday, monthlyFromWeekly, previousMonthWeekly, recommendWeekly, savingsPosition, weekCanBeConfirmed, weeklyBaselines, weeklyFromMonthly, weeklySummary } from '../src/lib/weekly.js'
+import { cents, dailyAllowance, expectedIncome, incomeSuggestion, monday, monthlyFromWeekly, previousMonthWeekly, recommendWeekly, savingsPosition, weekCanBeConfirmed, weeklyBaselines, weeklyFromMonthly, weeklyLoggingStreak, weeklySummary } from '../src/lib/weekly.js'
 import { matchSuggestions } from '../src/lib/reconciliation.js'
 import { monthlySummary } from '../src/lib/tracker.js'
 
@@ -11,6 +11,21 @@ test('daily cent allocation reconciles each calendar month including leap Februa
   assert.equal(monday('2027-01-01'),'2026-12-28')
   assert.equal(weekCanBeConfirmed('2026-10-04','2026-10-04'),true)
   assert.equal(weekCanBeConfirmed('2026-10-04','2026-10-03'),false)
+})
+test('weekly logging streak counts explicit consecutive completed-week sign-offs', () => {
+  const confirmations=[
+    {weekStart:'2026-09-07'},
+    {weekStart:'2026-09-14'},
+    {weekStart:'2026-09-28'},
+    {weekStart:'2026-10-05'},
+  ]
+  const mondayResult=weeklyLoggingStreak(confirmations,'2026-10-12')
+  assert.deepEqual({current:mondayResult.current,best:mondayResult.best,throughWeek:mondayResult.throughWeek},{current:2,best:2,throughWeek:'2026-10-05'})
+  assert.equal(mondayResult.recent.at(-1).status,'logged')
+  assert.equal(mondayResult.recent.at(-2).status,'logged')
+  assert.equal(mondayResult.recent.at(-3).status,'missed')
+  const sundayResult=weeklyLoggingStreak([...confirmations,{weekStart:'2026-10-12'}],'2026-10-18')
+  assert.equal(sundayResult.current,3)
 })
 test('cross-month allowances require both targets and spending uses active expense rows', () => {
   const budgets=[{monthKey:'2026-08',bucket:'Groceries',target:310},{monthKey:'2026-09',bucket:'Groceries',target:600}]

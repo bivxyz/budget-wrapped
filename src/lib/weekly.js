@@ -22,6 +22,25 @@ export const sunday = key => shiftDay(monday(key), 6)
 export const weekCanBeConfirmed = (weekEnd, today = dateKey()) => weekEnd <= today
 export const activeTransactions = rows => rows.filter(row => !row.deletedAt && !row.matchedTxnKey)
 
+export function weeklyLoggingStreak(confirmations = [], asOf = dateKey()) {
+  const currentWeek = monday(asOf)
+  const latestEligible = weekCanBeConfirmed(sunday(currentWeek), asOf) ? currentWeek : shiftDay(currentWeek, -7)
+  const confirmed = new Set(confirmations.map(row => row.weekStart).filter(start => validDate(start) && monday(start) === start && start <= latestEligible))
+  let current = 0
+  for (let week = latestEligible; confirmed.has(week); week = shiftDay(week, -7)) current += 1
+  let best = 0, run = 0, previous = null
+  for (const week of [...confirmed].sort()) {
+    run = previous && shiftDay(previous, 7) === week ? run + 1 : 1
+    best = Math.max(best, run)
+    previous = week
+  }
+  const recent = Array.from({ length: 6 }, (_, index) => {
+    const weekStart = shiftDay(latestEligible, (index - 5) * 7)
+    return { weekStart, status: confirmed.has(weekStart) ? 'logged' : 'missed' }
+  })
+  return { current, best, throughWeek: latestEligible, recent }
+}
+
 // Allocate leftover cents to the first days: every month's daily shares sum exactly to its target.
 export function dailyAllowance(target, key) {
   const [year, month, day] = key.split('-').map(Number)

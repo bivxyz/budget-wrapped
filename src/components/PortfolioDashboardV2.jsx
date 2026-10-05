@@ -4,11 +4,12 @@ import Slideshow from './Slideshow.jsx'
 import ManualExpense from './ManualExpense.jsx'
 import WeeklyBudget from './WeeklyBudgetV2.jsx'
 import ReconciliationPanel from './ReconciliationPanel.jsx'
-import MonthlyHome from './MonthlyHomeV2.jsx'
+import MonthlyHome from './MonthlyHomeSimple.jsx'
 import TransactionTracker from './TransactionTrackerV2.jsx'
 import SelectMenu from './SelectMenu.jsx'
 import ExportMenu from './ExportMenu.jsx'
 import IconButton,{Icon} from './IconButton.jsx'
+import TrackerUpload from './TrackerUpload.jsx'
 import { formatCurrency } from '../lib/finance.js'
 import { effectiveTransaction } from '../lib/tracker.js'
 import { annualTrendView,shiftMonth } from '../lib/portfolio.js'
@@ -19,7 +20,7 @@ const emptyMonth={totalSpent:0,totalIncome:0,investmentContributions:0,operating
 
 export default function PortfolioDashboardV2({portfolio,archive,shared,onSharedChanged,onOverride,defaultBudgets,initialMonth}){
   const [month,setMonth]=useState(initialMonth||portfolio.currentKey),[view,setView]=useState('overview'),[transactionPreset,setTransactionPreset]=useState(null),[budgetDirty,setBudgetDirty]=useState(false),[discardVersion,setDiscardVersion]=useState(0),[reviewBusy,setReviewBusy]=useState(false),[reviewError,setReviewError]=useState(''),[statusBusy,setStatusBusy]=useState(false),[statusError,setStatusError]=useState('')
-  const [manualForm,setManualForm]=useState(null),[manualNotice,setManualNotice]=useState('')
+  const [manualForm,setManualForm]=useState(null),[manualNotice,setManualNotice]=useState(''),[uploadOpen,setUploadOpen]=useState(false)
   const rows=archive[month]||[],monthly=portfolio.monthly[month]||emptyMonth,data=portfolio.analyses[month]
   const categories=useMemo(()=>[...new Set([...Object.values(archive).flat().map(effectiveTransaction).filter(row=>row.flow==='Expense').map(row=>row.bucket),...Object.keys(defaultBudgets),...monthly.pacing.map(row=>row.bucket),'Uncategorized'].filter(Boolean))].sort(),[archive,defaultBudgets,monthly.pacing])
   const selectedYear=month.slice(0,4),years=[...new Set([selectedYear,...portfolio.months.map(key=>key.slice(0,4))])].sort(),monthOptions=portfolio.months.filter(key=>key.startsWith(`${selectedYear}-`)).map(key=>({value:key,label:new Date(2000,Number(key.slice(5))-1,1).toLocaleString('en-US',{month:'short'})}))
@@ -31,8 +32,8 @@ export default function PortfolioDashboardV2({portfolio,archive,shared,onSharedC
   const navigate=next=>{const changed=changeView(next);if(changed&&next==='transactions')setTransactionPreset(null);return changed}
   const openTransactions=(preset=null)=>{if(!changeView('transactions'))return false;setTransactionPreset(preset?{...preset,version:Date.now()}:null);return true}
   const beforeUpload=()=>locked?false:discardDraft('Discard the unsaved monthly budget draft and choose a Rocket Money CSV?')
-  const openUpload=()=>{if(!changeView('overview'))return;setTimeout(()=>document.getElementById('rocket-upload-button')?.click(),0)}
-  const handleUploaded=async result=>{await onSharedChanged();if(result.latestMonth){setMonth(result.latestMonth);history.replaceState(null,'',`?m=${result.latestMonth}`)}setReviewError('');setTransactionPreset(null);setView('transactions')}
+  const openUpload=()=>{if(!discardDraft('Discard the unsaved monthly budget draft and choose a Rocket Money CSV?'))return;setUploadOpen(true)}
+  const handleUploaded=async result=>{setUploadOpen(false);await onSharedChanged();if(result.latestMonth){setMonth(result.latestMonth);history.replaceState(null,'',`?m=${result.latestMonth}`)}setReviewError('');setTransactionPreset(null);setView('transactions')}
   const completeReview=async()=>{if(!review)return;setReviewBusy(true);setReviewError('');try{await postJson('/api/review',{monthKey:month,uploadEventId:review.uploadEventId,revision:review.revision||0});await onSharedChanged()}catch(error){setReviewError(error.message)}finally{setReviewBusy(false)}}
   const changeMonthStatus=async action=>{if(!discardDraft('Discard the unsaved budget draft before changing month status?'))return;const verb=action==='close'?'Close':'Reopen';if(!window.confirm(`${verb} ${monthLabelLong(month)}?`))return;setStatusBusy(true);setStatusError('');try{await postJson('/api/month-status',{action,monthKey:month});await onSharedChanged();if(action==='close'){const next=shiftMonth(month,1);setMonth(next);setView('overview');history.replaceState(null,'',`?m=${next}`)}}catch(error){setStatusError(error.message)}finally{setStatusBusy(false)}}
   const openManual=row=>{if(discardDraft('Discard the unsaved budget draft before adding or editing an expense?'))setManualForm({row})}
@@ -58,9 +59,10 @@ export default function PortfolioDashboardV2({portfolio,archive,shared,onSharedC
         {!shared.available&&<SharedStatus/>}
         {(manualNotice||statusError)&&<div className={`app-notice ${statusError?'app-notice-error':''}`} role="status">{statusError||manualNotice}</div>}
         {manualForm&&<ManualExpense row={manualForm.row} categories={categories} accounts={accounts} onClose={()=>setManualForm(null)} onSaved={manualSaved}/>} 
+        {uploadOpen&&<div className="upload-modal-backdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setUploadOpen(false)}}><div className="upload-modal" role="dialog" aria-modal="true" aria-label="Upload Rocket Money CSV"><div className="upload-modal-heading"><strong>Update transactions</strong><button type="button" className="quiet-action" onClick={()=>setUploadOpen(false)}>Close</button></div><TrackerUpload compact lastUpload={shared.lastUpload} onUploaded={handleUploaded} beforeChoose={beforeUpload}/></div></div>}
         {view==='transactions'&&<ReconciliationPanel shared={shared} month={month} onChanged={onSharedChanged}/>} 
         {view==='weekly'&&<WeeklyBudget key={`${month}:${discardVersion}`} month={month} shared={shared} onChanged={onSharedChanged} onDirtyChange={setBudgetDirty}/>} 
-        {view==='overview'&&<MonthlyHome month={month} monthly={monthly} rows={rows} previous={previous} categories={categories} setting={setting} shared={shared} streak={portfolio.streak} review={review} closeout={closeout} statusBusy={statusBusy} statusError={statusError} onMonthStatus={changeMonthStatus} onSharedChanged={onSharedChanged} onUploaded={handleUploaded} onOpenTransactions={openTransactions} onOpenWeekly={()=>changeView('weekly')} onReplay={()=>changeView('slideshow')} onDirtyChange={setBudgetDirty} beforeUpload={beforeUpload} discardVersion={discardVersion}/>}
+        {view==='overview'&&<MonthlyHome month={month} monthly={monthly} monthlyHistory={portfolio.monthly} categories={categories} shared={shared} closeout={closeout} onSharedChanged={onSharedChanged} onOpenWeekly={()=>changeView('weekly')} onDirtyChange={setBudgetDirty} discardVersion={discardVersion}/>}
         {view==='transactions'&&<TransactionTracker rows={rows} categories={categories} preset={transactionPreset} onOverride={onOverride} review={review} busy={reviewBusy} error={reviewError} onReview={completeReview} locked={locked||!shared.available} onEditManual={openManual} onChanged={onSharedChanged}/>}
         {view==='trends'&&<Trends portfolio={portfolio} year={selectedYear}/>} 
       </main>

@@ -17,6 +17,18 @@ export function budgetRingData(monthly={}){
 }
 
 const shiftMonth=(key,offset)=>{const [year,month]=key.split('-').map(Number),date=new Date(year,month-1+offset,1);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`}
+export function savingsGoalStreak(monthly={},settings=[],closeouts=[]){
+  const closed=[...new Set(closeouts.map(row=>row.monthKey))].sort(),latest=closed.at(-1)
+  if(!latest)return{current:0,best:0,amount:0,throughMonth:null,recent:[]}
+  const goals=new Map(settings.map(row=>[row.monthKey,Number(row.savings)||0])),closedSet=new Set(closed)
+  const result=month=>{const goal=goals.get(month),actual=Math.round(Number(monthly[month]?.savingsLoss||0)*100);if(!closedSet.has(month))return{month,status:'open',difference:0};if(!goal)return{month,status:'no-goal',difference:0};return{month,status:actual>=goal?'success':'miss',difference:(actual-goal)/100}}
+  const successful=new Set(closed.map(result).filter(row=>row.status==='success').map(row=>row.month))
+  let current=0,amount=0
+  for(let month=latest;successful.has(month);month=shiftMonth(month,-1)){current+=1;amount+=result(month).difference}
+  let best=0,run=0,previous=null
+  for(const month of closed){run=successful.has(month)?previous&&shiftMonth(previous,1)===month?run+1:1:0;best=Math.max(best,run);previous=month}
+  return{current,best,amount,throughMonth:latest,recent:Array.from({length:6},(_,index)=>result(shiftMonth(latest,index-5)))}
+}
 const covered=(coverage,month)=>coverage.some(range=>range.from<=`${month}-01`&&range.through>=monthEndDate(month))
 export function cutbackOpportunities(rows=[],budgets=[],coverage=[],month){
   const previous=shiftMonth(month,-1),complete=covered(coverage,previous),comparisonMonths=[shiftMonth(previous,-2),shiftMonth(previous,-1),previous].filter(key=>covered(coverage,key))
