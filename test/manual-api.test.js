@@ -86,10 +86,12 @@ test('matching requires explicit override replacement and linked rows lock with 
 })
 test('weekly plan atomically updates only two targets and preserves pacing/order',async()=>{
   const db=database();db.sqlite.exec("INSERT INTO monthly_budgets VALUES('2026-08','Bills',200,0,'now','test',0),('2026-08','Groceries',50,0,'now','test',1)")
-  const body={monthKey:'2026-08',income:500000,savings:100000,groceriesWeekly:20000,restaurantsWeekly:10000,groceriesBaselineWeekly:20000,restaurantsBaselineWeekly:10000,incomeConfirmed:true,commitmentsConfirmed:true}
+  const body={monthKey:'2026-08',groceriesWeekly:20000,restaurantsWeekly:10000}
   assert.equal((await call(weeklyPlan,db,body)).status,200)
   let shared=await getState(db);assert.equal(shared.budgets.find(row=>row.bucket==='Bills').target,200);assert.equal(shared.budgets.find(row=>row.bucket==='Groceries').paced,false);assert.equal(shared.budgetSettings[0].spendingLimit,1500)
-  const warned=await call(weeklyPlan,db,{...body,income:100});assert.equal(warned.status,200);assert.ok(warned.affordability.shortfall>0)
+  assert.equal(shared.savingsSettings.length,0)
+  assert.equal((await call(savingsGoal,db,{monthKey:'2026-08',income:100,savings:0,incomeConfirmed:true})).status,200)
+  const warned=await call(weeklyPlan,db,body);assert.equal(warned.status,200);assert.ok(warned.affordability.shortfall>0)
   shared=await getState(db);assert.equal(shared.savingsSettings[0].income,100)
   const original=db.batch;db.batch=async statements=>original([...statements,db.prepare('INSERT INTO missing_table VALUES(1)')])
   assert.equal((await call(weeklyPlan,db,{...body,groceriesWeekly:25000})).status,400)

@@ -386,6 +386,20 @@ button.audit-row:hover,button.audit-excluded-row:hover:not(:disabled) { border-r
 .weekly-target-pair span { color: rgba(255,255,255,.35); font-size: .62rem; }
 .weekly-target-pair strong { margin-top: .16rem; font-size: .77rem; }
 .weekly-plan-summary > p { margin-top: .8rem; font-size: .7rem; }
+.weekly-workspace-simple { grid-template-columns: minmax(0,1fr) 340px; }
+.weekly-target-editor { position: sticky; top: 92px; }
+.weekly-target-editor > div:first-child p { margin-top: .2rem; font-size: .7rem; }
+.weekly-target-editor fieldset { display: grid; gap: .75rem; margin-top: .9rem; }
+.weekly-target-input { display: grid; gap: .35rem; border: 1px solid rgba(255,255,255,.075); border-radius: .65rem; background: rgba(0,0,0,.1); padding: .7rem; }
+.weekly-target-input > span { display: flex; align-items: center; gap: .4rem; font-size: .75rem; }
+.weekly-target-input .field { width: 100%; min-height: 44px; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.weekly-target-input small,.weekly-target-month { color: rgba(255,255,255,.34); font-size: .59rem; }
+.weekly-recommendation { display: grid; gap: .18rem; border-radius: .55rem; background: rgba(0,255,135,.055); padding: .65rem; }
+.weekly-recommendation span { color: rgba(255,255,255,.38); font-size: .6rem; }
+.weekly-recommendation strong { font-size: .72rem; }
+.weekly-recommendation button { justify-self: start; margin-top: .25rem; }
+.weekly-target-save { width: 100%; min-height: 44px; }
+.weekly-target-month { display: block; margin-top: .7rem; text-align: center; }
 .weekly-planner-disclosure { grid-column: 1/-1; padding: 0; overflow: hidden; }
 .weekly-planner-disclosure > summary { padding: 1rem; }
 .weekly-planner-disclosure summary strong { font-size: 1rem; }
@@ -491,6 +505,8 @@ button.audit-row:hover,button.audit-excluded-row:hover:not(:disabled) { border-r
   .home-workspace,.weekly-workspace,.view-workspace { grid-template-columns: minmax(0,1fr); }
   .home-support-column { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .weekly-plan-summary { grid-row: 2; }
+  .weekly-workspace-simple { grid-template-columns: minmax(0,1fr); }
+  .weekly-target-editor { position: static; }
   .weekly-planner-disclosure { grid-column: 1; }
   .transaction-toolbar { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .savings-goal-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
