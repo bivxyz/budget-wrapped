@@ -1,5 +1,8 @@
 import { actor, json, requireDb } from './_utils.js'
 import { assertOpen, manualInput } from './_manual.js'
+import { monday } from '../../src/lib/weekly.js'
+
+const invalidateWeek = (db, date) => db.prepare('DELETE FROM weekly_confirmations WHERE week_start=?').bind(monday(date)).run()
 
 export async function onRequestPost({ request, env }) {
   try {
@@ -9,8 +12,9 @@ export async function onRequestPost({ request, env }) {
       if(body.clientId && !/^[0-9a-f-]{36}$/i.test(body.clientId))throw new Error('Invalid expense request ID.')
       const row = manualInput(body), key = `manual:${body.clientId || crypto.randomUUID()}`
       await assertOpen(db, row.date)
-      await db.prepare(`INSERT INTO transactions(txn_key,date,amount,name,bucket,account,is_income,imported_flow,source,created_at,created_by,uploaded_at,uploaded_by)
+      const result = await db.prepare(`INSERT INTO transactions(txn_key,date,amount,name,bucket,account,is_income,imported_flow,source,created_at,created_by,uploaded_at,uploaded_by)
         VALUES(?,?,?,?,?,?,0,'Expense','manual',?,?,?,?) ON CONFLICT(txn_key) DO NOTHING`).bind(key, row.date, row.amount, row.name, row.bucket, row.account, now, user, now, user).run()
+      if (result.meta.changes) await invalidateWeek(db, row.date)
       return json({ ok: true, txnKey: key })
     }
     const old = await db.prepare("SELECT * FROM transactions WHERE txn_key=? AND source='manual' AND deleted_at IS NULL").bind(body.txnKey).first()
@@ -20,12 +24,15 @@ export async function onRequestPost({ request, env }) {
     if (body.action === 'delete') {
       const result=await db.prepare('UPDATE transactions SET deleted_at=? WHERE txn_key=? AND NOT EXISTS(SELECT 1 FROM transaction_matches WHERE manual_key=? AND undone_at IS NULL)').bind(now, body.txnKey, body.txnKey).run()
       if(!result.meta.changes)throw new Error('Expense changed. Refresh before deleting.')
+      await invalidateWeek(db, old.date)
     } else {
       const row = manualInput(body)
       await assertOpen(db, row.date)
       const result=await db.prepare(`UPDATE transactions SET date=?,amount=?,name=?,bucket=?,account=?,override_bucket=NULL WHERE txn_key=?
         AND NOT EXISTS(SELECT 1 FROM transaction_matches WHERE manual_key=? AND undone_at IS NULL)`).bind(row.date, row.amount, row.name, row.bucket, row.account, body.txnKey, body.txnKey).run()
       if(!result.meta.changes)throw new Error('Expense changed. Refresh before editing.')
+      await invalidateWeek(db, old.date)
+      if (monday(old.date) !== monday(row.date)) await invalidateWeek(db, row.date)
     }
     return json({ ok: true })
   } catch (error) { return json({ error: error.message }, 400) }

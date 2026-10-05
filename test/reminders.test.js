@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DatabaseSync } from 'node:sqlite'
 import { readFileSync, readdirSync } from 'node:fs'
-import { composeWeeklyReminder, cutbackPreview } from '../src/lib/reminders.js'
+import { composeWeeklyReminder, composeWeeklySpending, cutbackPreview, MESSAGE_CATEGORIES } from '../src/lib/reminders.js'
 import { weeklySummary } from '../src/lib/weekly.js'
 import { onRequestPost as reminders } from '../functions/api/reminders.js'
 import { onRequestPost as confirmWeek } from '../functions/api/weekly-confirmation.js'
@@ -16,11 +16,12 @@ function database() {
 const call = async (handler, DB, body, token) => { const response=await handler({env:{DB,REMINDER_AGENT_TOKEN:'agent-secret'},request:new Request('https://example.test/api',{method:'POST',headers:{'content-type':'application/json',...(token?{'X-Budget-Reminder-Token':token}:{})},body:JSON.stringify(body)})}); return {httpStatus:response.status,...await response.json()} }
 
 test('weekly reminder uses concise emoji lines and slash-formatted dates',()=>{
-  const budgets=[{monthKey:'2027-02',bucket:'Groceries',target:1000},{monthKey:'2027-02',bucket:'Restaurants/Fast Food',target:400}],row={date:'2027-02-03',amount:200,bucket:'Groceries',flow:'Expense'}
-  const applied=composeWeeklyReminder(weeklySummary([row],budgets,'2027-02-08',{coverage:[{from:'2027-02-01',through:'2027-02-07'}]}))
-  assert.equal(applied.text,'Budget this week (02/08–02/14):\n🛒 Groceries: $300.06\n🍽️ Dining: $200.06')
-  const stale=composeWeeklyReminder(weeklySummary([row],budgets,'2027-02-08'))
-  assert.equal(stale.text,'Budget this week (02/08–02/14):\n🛒 Groceries: $250.02\n🍽️ Dining: $100.03')
+  const budgets=[{monthKey:'2027-02',bucket:'Groceries',target:1000},{monthKey:'2027-02',bucket:'Restaurants/Fast Food',target:400},{monthKey:'2027-02',bucket:'Shopping/Gifts',target:280}],rows=[{date:'2027-02-09',amount:200,name:'Market',bucket:'Groceries',flow:'Expense'},{date:'2027-02-10',amount:40,name:'Cafe',bucket:'Restaurants/Fast Food',flow:'Expense'},{date:'2027-02-11',amount:60,name:'Target',bucket:'Shopping/Gifts',flow:'Expense'}]
+  const summary=weeklySummary(rows,budgets,'2027-02-08',{categories:MESSAGE_CATEGORIES.map(row=>row.bucket)})
+  const budget=composeWeeklyReminder(summary)
+  assert.equal(budget.text,'Budget this week (02/08–02/14):\n🛒 Groceries: $250.02\n🍽️ Dining: $100.03\n🛍️ Shopping: $70')
+  assert.equal(composeWeeklySpending(summary).text,'Spent last week (02/08–02/14):\n🛒 Groceries: $200\n🍽️ Dining: $40\n🛍️ Shopping: $60\n💸 Biggest: Market — $200')
+  assert.equal(composeWeeklyReminder(weeklySummary(rows,budgets.slice(0,2),'2027-02-08',{categories:MESSAGE_CATEGORIES.map(row=>row.bucket)})).canSend,false)
 })
 test('cutback preview ranks variable risks, excludes fixed expenses, and handles a healthy month',()=>{
   const rows=[{date:'2026-10-10',amount:90,bucket:'Groceries',flow:'Expense'},{date:'2026-10-10',amount:5000,bucket:'Fixed Expenses',flow:'Expense'}],budgets=[{monthKey:'2026-10',bucket:'Groceries',target:100},{monthKey:'2026-10',bucket:'Fixed Expenses',target:5000}]
@@ -47,9 +48,14 @@ test('reminder outbox is idempotent, agent protected, and records delivery',asyn
   assert.equal((await call(reminders,db,{action:'complete',id:claimed.item.id,claimToken:claimed.item.claimToken},'agent-secret')).httpStatus,200)
   assert.equal(db.sqlite.prepare('SELECT status FROM message_outbox').get().status,'sent')
 })
-test('automatic weekly reminders deduplicate by week',async()=>{
-  const db=database();db.sqlite.exec("INSERT INTO monthly_budgets(month_key,bucket,target,paced,updated_at,updated_by,sort_order) VALUES('2027-02','Groceries',1000,1,'now','test',0),('2027-02','Restaurants/Fast Food',400,1,'now','test',1)")
-  const body={action:'automatic',weekStart:'2027-02-08'}
-  await call(reminders,db,body,'agent-secret');await call(reminders,db,body,'agent-secret')
-  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM message_outbox').get().count,1)
+test('manual weekly budget and spending messages require confirmation and queue separately',async()=>{
+  const db=database();db.sqlite.exec("INSERT INTO monthly_budgets(month_key,bucket,target,paced,updated_at,updated_by,sort_order) VALUES('2027-02','Groceries',1000,1,'now','test',0),('2027-02','Restaurants/Fast Food',400,1,'now','test',1),('2027-02','Shopping/Gifts',280,1,'now','test',2); INSERT INTO transactions(txn_key,date,amount,name,bucket,account,is_income,uploaded_at,uploaded_by,source,imported_flow) VALUES('shop','2027-02-03',50,'Target','Shopping/Gifts','Card',0,'now','test','manual','Expense')")
+  const id='12345678-1234-1234-1234-123456789012'
+  assert.equal((await call(reminders,db,{action:'preview',kind:'weekly-spend',weekStart:'2027-02-01'})).httpStatus,400)
+  db.sqlite.exec("INSERT INTO weekly_confirmations VALUES('2027-02-01','2027-02-07','now','test')")
+  const spend=await call(reminders,db,{action:'queue',kind:'weekly-spend',weekStart:'2027-02-01',clientId:id})
+  const budget=await call(reminders,db,{action:'queue',kind:'weekly',weekStart:'2027-02-08',confirmationWeekStart:'2027-02-01',clientId:'22345678-1234-1234-1234-123456789012'})
+  assert.equal(spend.httpStatus,200);assert.equal(budget.httpStatus,200)
+  assert.deepEqual(db.sqlite.prepare('SELECT kind FROM message_outbox ORDER BY id').all().map(row=>row.kind),['weekly-spend','weekly'])
+  assert.equal((await call(reminders,db,{action:'automatic',weekStart:'2027-02-08'},'agent-secret')).httpStatus,400)
 })

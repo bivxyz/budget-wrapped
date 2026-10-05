@@ -8,7 +8,7 @@ A private shared family budget tracker built around Rocket Money CSV exports. It
 2. Open the selected month and upload the CSV. Repeated YTD uploads are safe and refresh imported fields without removing app overrides.
 3. Review uncategorized or edited rows, adjust category and flow type, and update that month's budgets.
 4. Use the top-five expenses, top-three categories, pacing, trends, and Wrapped replay to review the month together.
-5. Use the weekly grocery and dining envelopes. Confirm completed weeks to carry unused allowance forward, and use the private Monday iMessage reminder as a short family check-in.
+5. Use the weekly grocery and dining targets, log the prior week from Overview, confirm it, and manually send the private budget and spending iMessages.
 
 Corrections affect Budget Wrapped only; they do not sync back to Rocket Money. The original Rocket Money category remains visible in the tracking table.
 

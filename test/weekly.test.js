@@ -20,32 +20,32 @@ test('cross-month allowances require both targets and spending uses active expen
   assert.equal(result.allowance,13000);assert.equal(result.spent,2500);assert.equal(result.remaining,10500)
   assert.equal(weeklySummary(rows,budgets.slice(0,1),'2026-09-01').categories[0].allowance,null)
 })
-test('confirmed underspending rolls forward while stale and overspent weeks keep the base',()=>{
+test('weekly allowances never roll forward after underspending or confirmation',()=>{
   const budgets=[{monthKey:'2027-02',bucket:'Groceries',target:1000},{monthKey:'2027-02',bucket:'Restaurants/Fast Food',target:400}]
   const row=amount=>({date:'2027-02-03',name:'Market',bucket:'Groceries',flow:'Expense',amount})
   const stale=weeklySummary([row(200)],budgets,'2027-02-08').categories[0]
-  assert.equal(stale.baseAllowance,25002);assert.equal(stale.rollover,0);assert.equal(stale.available,25002);assert.equal(stale.rolloverStatus,'pending')
+  assert.equal(stale.baseAllowance,25002);assert.equal(stale.rollover,0);assert.equal(stale.available,25002);assert.equal(stale.rolloverStatus,'none')
   const covered=weeklySummary([row(200)],budgets,'2027-02-08',{coverage:[{from:'2027-02-01',through:'2027-02-07'}]}).categories[0]
-  assert.equal(covered.baseAllowance,25002);assert.equal(covered.rollover,5004);assert.equal(covered.available,30006);assert.equal(covered.rolloverStatus,'applied')
+  assert.equal(covered.baseAllowance,25002);assert.equal(covered.rollover,0);assert.equal(covered.available,25002);assert.equal(covered.rolloverStatus,'none')
   const signed=weeklySummary([row(200)],budgets,'2027-02-08',{confirmations:[{weekStart:'2027-02-01',confirmedAt:'now'}]}).categories[0]
-  assert.equal(signed.available,30006)
+  assert.equal(signed.available,25002)
   const overspent=weeklySummary([row(300)],budgets,'2027-02-08',{coverage:[{from:'2027-02-01',through:'2027-02-07'}]}).categories[0]
   assert.equal(overspent.rollover,0);assert.equal(overspent.available,25002)
 })
-test('rollover accumulates, stays under the monthly remainder, and resets next month',()=>{
+test('weekly allowance always uses the exact calendar-day share of its monthly target',()=>{
   const budgets=[{monthKey:'2027-02',bucket:'Groceries',target:1000},{monthKey:'2027-03',bucket:'Groceries',target:1000}]
   const rows=[{date:'2027-02-03',amount:200,bucket:'Groceries',flow:'Expense'},{date:'2027-02-10',amount:250,bucket:'Groceries',flow:'Expense'}]
   const week3=weeklySummary(rows,budgets,'2027-02-15',{coverage:[{from:'2027-02-01',through:'2027-02-14'}]}).categories[0]
-  assert.equal(week3.baseAllowance,24997);assert.equal(week3.rollover,5006);assert.equal(week3.available,30003)
+  assert.equal(week3.baseAllowance,24997);assert.equal(week3.rollover,0);assert.equal(week3.available,24997)
   const capped=weeklySummary([{date:'2027-02-03',amount:950,bucket:'Groceries',flow:'Expense'}],budgets,'2027-02-22',{coverage:[{from:'2027-02-01',through:'2027-02-21'}]}).categories[0]
-  assert.equal(capped.available,5000)
+  assert.equal(capped.available,24997)
   const march=weeklySummary(rows,budgets,'2027-03-01',{coverage:[{from:'2027-02-01',through:'2027-02-28'}]}).categories[0]
   assert.equal(march.rollover,0)
 })
-test('month-opening partial weeks need coverage only for days inside that month',()=>{
+test('month-opening partial weeks do not depend on coverage for allowance',()=>{
   const budgets=[{monthKey:'2026-09',bucket:'Groceries',target:300}],rows=[{date:'2026-09-02',amount:20,bucket:'Groceries',flow:'Expense'}]
   const result=weeklySummary(rows,budgets,'2026-09-07',{coverage:[{from:'2026-09-01',through:'2026-09-06'}]}).categories[0]
-  assert.equal(result.rolloverStatus,'applied');assert.ok(result.rollover>0);assert.deepEqual(result.pendingWeeks,[])
+  assert.equal(result.rolloverStatus,'none');assert.equal(result.rollover,0);assert.deepEqual(result.pendingWeeks,[])
 })
 test('covered zero-spending weeks count; partial and current weeks do not', () => {
   const rows=[{date:'2026-08-04',amount:100,flow:'Expense',bucket:'Groceries'}]
@@ -74,13 +74,13 @@ test('savings position separates selected goal, extra capacity, and shortfall',(
   assert.equal(savingsPosition({income:1000000,savings:500000,budget:600000}).shortfall,100000)
   assert.deepEqual(savingsPosition({income:50000,savings:100000,budget:20000,projected:80000}),{spendable:-50000,extra:0,shortfall:70000,planned:30000,projected:-30000})
 })
-test('exact matching requires unique amount/date/merchant/account and preserves uncertainty', () => {
+test('automatic matching allows a unique settlement-date shift but preserves uncertainty', () => {
   const manual={txnKey:'m',source:'manual',date:'2026-08-03',amount:20,name:' Market ',account:' Card ',bucket:'Groceries',flow:'Expense'}
   const imported={...manual,txnKey:'i',source:'import',name:'market',account:'card'}
   assert.equal(matchSuggestions([manual,imported])[0].automatic,true)
   assert.equal(matchSuggestions([manual,imported,{...imported,txnKey:'i2'}]).some(row=>row.automatic),false)
   assert.equal(matchSuggestions([{...manual,account:''},imported])[0].automatic,false)
-  assert.equal(matchSuggestions([manual,{...imported,date:'2026-08-04'}])[0].automatic,false)
+  const shifted=matchSuggestions([manual,{...imported,date:'2026-08-04'}])[0];assert.equal(shifted.automatic,true);assert.equal(shifted.exact,false);assert.equal(shifted.settled,true)
   assert.equal(matchSuggestions([manual,{...imported,overrideBucket:'Dining'}])[0].automatic,false)
   assert.equal(matchSuggestions([manual,imported],[{manualKey:'m',importedKey:'i',undoneAt:'now'}])[0].automatic,false)
 })

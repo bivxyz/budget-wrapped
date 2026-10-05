@@ -32,9 +32,17 @@ test('manual create/edit/delete persists and invalidates reviewed state', async(
   await call(manual,db,{action:'delete',txnKey:created.txnKey});assert.ok((await getState(db)).transactions.find(row=>row.txnKey===created.txnKey).deletedAt)
   for(const amount of [-1,0,1.001])assert.equal((await call(manual,db,{...expense,amount,action:'create'})).status,400)
 })
+test('manual changes reopen a signed-off week',async()=>{
+  const db=database();db.sqlite.exec("INSERT INTO weekly_confirmations VALUES('2026-08-03','2026-08-09','now','test')")
+  const created=await call(manual,db,{...expense,action:'create'});assert.equal(created.status,200)
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM weekly_confirmations').get().count,0)
+  db.sqlite.exec("INSERT INTO weekly_confirmations VALUES('2026-08-03','2026-08-09','now','test')")
+  await call(manual,db,{...expense,amount:25,txnKey:created.txnKey,action:'update'})
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM weekly_confirmations').get().count,0)
+})
 test('upload automatically links once, preserves category, undo survives re-upload',async()=>{
   const db=database(),created=await call(manual,db,{...expense,action:'create'})
-  const payload={transactions:[{...expense,bucket:'Dining'}],coverage:{from:'2026-08-01',through:'2026-08-31'}}
+  const payload={transactions:[{...expense,date:'2026-08-05',bucket:'Dining'}],coverage:{from:'2026-08-01',through:'2026-08-31'}}
   assert.equal((await call(upload,db,payload)).matched,1)
   let shared=await getState(db);const match=shared.transactionMatches[0]
   assert.equal(shared.transactions.find(row=>row.source==='import').bucket,'Groceries')
@@ -65,7 +73,7 @@ test('identical imported purchases remain distinct and ambiguous; repeat import 
 })
 test('matching requires explicit override replacement and linked rows lock with closeout',async()=>{
   const db=database(),created=await call(manual,db,{...expense,action:'create'})
-  await call(upload,db,{transactions:[{...expense,date:'2026-08-04'}]})
+  await call(upload,db,{transactions:[{...expense,name:'Different merchant',date:'2026-08-04'}]})
   const imported=(await getState(db)).transactions.find(row=>row.source==='import')
   db.sqlite.prepare('UPDATE transactions SET override_bucket=? WHERE txn_key=?').run('Other',imported.txnKey)
   const match={action:'link',manualKey:created.txnKey,importedKey:imported.txnKey}

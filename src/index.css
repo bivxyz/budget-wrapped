@@ -337,6 +337,7 @@ button.audit-row:hover,button.audit-excluded-row:hover:not(:disabled) { border-r
 .weekly-category-remaining small { color: rgba(255,255,255,.33); font-size: .58rem; }
 .weekly-card-progress { height: 5px; margin-top: .8rem; }
 .weekly-envelope-math { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .45rem; margin-top: .8rem; }
+.weekly-envelope-math-simple { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .weekly-envelope-math div { border: 1px solid rgba(255,255,255,.065); border-radius: .5rem; background: rgba(255,255,255,.025); padding: .5rem; }
 .weekly-envelope-math span,.weekly-envelope-math strong { display: block; }
 .weekly-envelope-math span { color: rgba(255,255,255,.34); font-size: .58rem; }
@@ -396,6 +397,37 @@ button.audit-row:hover,button.audit-excluded-row:hover:not(:disabled) { border-r
 .planner-save small { margin-top: .1rem; color: rgba(255,255,255,.35); font-size: .65rem; }
 .planner-save-warning { border: 1px solid rgba(255,215,0,.22); border-radius: .65rem; background: rgba(255,215,0,.055); padding: .75rem; }
 
+/* Weekly expense check-in */
+.weekly-checkin { border-color: rgba(0,212,255,.16); }
+.quick-expense-form { display: grid; grid-template-columns: 150px minmax(180px,1.4fr) 120px minmax(165px,1fr) minmax(165px,1fr) auto auto; align-items: end; gap: .55rem; margin-top: 1rem; }
+.quick-expense-form label { min-width: 0; color: rgba(255,255,255,.55); font-size: .65rem; font-weight: 700; }
+.quick-expense-form .field { display: block; width: 100%; min-height: 42px; margin-top: .28rem; }
+.quick-expense-form small { display: block; overflow: hidden; margin-top: .18rem; color: rgba(255,255,255,.3); font-size: .55rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.quick-expense-save { min-height: 42px; white-space: nowrap; }
+.quick-expense-list { margin-top: .9rem; border: 1px solid rgba(255,255,255,.075); border-radius: .65rem; background: rgba(0,0,0,.1); }
+.quick-expense-list-head { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .65rem .75rem; font-size: .72rem; }
+.quick-expense-list-head span { color: var(--color-accent-sky); font-variant-numeric: tabular-nums; font-weight: 800; }
+.quick-expense-list ol { max-height: 290px; overflow-y: auto; border-top: 1px solid rgba(255,255,255,.07); }
+.quick-expense-list li { display: grid; grid-template-columns: 62px minmax(0,1fr) auto auto; align-items: center; gap: .75rem; border-top: 1px solid rgba(255,255,255,.055); padding: .58rem .75rem; font-size: .7rem; }
+.quick-expense-list li:first-child { border-top: 0; }
+.quick-expense-date strong,.quick-expense-date small,.quick-expense-merchant strong,.quick-expense-merchant small { display: block; }
+.quick-expense-date small,.quick-expense-merchant small { overflow: hidden; margin-top: .08rem; color: rgba(255,255,255,.34); font-size: .57rem; text-overflow: ellipsis; white-space: nowrap; }
+.quick-expense-merchant { min-width: 0; }
+.quick-expense-merchant strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-expense-actions { display: flex; gap: .55rem; }
+.danger-action { color: var(--color-accent-coral); }
+.weekly-checkin-footer { display: grid; gap: .75rem; margin-top: .85rem; }
+.week-signoff { display: flex; align-items: center; justify-content: space-between; gap: .8rem; border: 1px solid rgba(255,255,255,.08); border-radius: .6rem; padding: .7rem; }
+.week-signoff strong,.week-signoff small { display: block; }
+.week-signoff strong { font-size: .74rem; }
+.week-signoff small { margin-top: .12rem; color: rgba(255,255,255,.35); font-size: .6rem; }
+.weekly-message-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.weekly-message-action { display: flex; align-items: center; justify-content: space-between; gap: .75rem; border: 1px solid rgba(255,255,255,.075); border-radius: .6rem; background: rgba(255,255,255,.02); padding: .65rem; }
+.weekly-message-action strong,.weekly-message-action small { display: block; }
+.weekly-message-action strong { font-size: .72rem; }
+.weekly-message-action small { margin-top: .12rem; color: rgba(255,255,255,.34); font-size: .57rem; }
+.weekly-message-action button { flex: none; }
+
 /* Family reminders */
 .reminder-panel h2 { margin-top: .18rem; }
 .reminder-panel > p { margin: .35rem 0 .8rem; font-size: .7rem; }
@@ -435,6 +467,8 @@ button.audit-row:hover,button.audit-excluded-row:hover:not(:disabled) { border-r
   .savings-goal-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .savings-goal-hero { grid-row: span 2; }
   .savings-goal-form { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .quick-expense-form { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .quick-expense-form .quick-expense-save { grid-column: span 2; }
 }
 
 @media (max-width: 920px) {
@@ -500,6 +534,14 @@ button.audit-row:hover,button.audit-excluded-row:hover:not(:disabled) { border-r
   .weekly-category-remaining { grid-column: 2; text-align: left; }
   .week-confirmation-bar { align-items: stretch; flex-direction: column; }
   .weekly-envelope-math { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .quick-expense-form { grid-template-columns: 1fr; }
+  .quick-expense-form .quick-expense-save { grid-column: auto; }
+  .quick-expense-list li { grid-template-columns: 52px minmax(0,1fr) auto; }
+  .quick-expense-actions { grid-column: 2/4; }
+  .week-signoff { align-items: stretch; flex-direction: column; }
+  .weekly-message-actions { grid-template-columns: 1fr; }
+  .weekly-message-action { align-items: stretch; flex-direction: column; }
+  .weekly-message-action button { min-height: 44px; }
   .weekly-target-pair { grid-template-columns: 1fr; }
   .weekly-planner-content { padding: .8rem; }
   .panel-titlebar { align-items: flex-start; }

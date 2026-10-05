@@ -1,22 +1,40 @@
-import { activeTransactions, cents, dateKey, dollars, shiftDay, WEEKLY_CATEGORIES } from './weekly.js'
+import { activeTransactions, cents, dateKey, dollars } from './weekly.js'
 import { effectiveTransaction } from './tracker.js'
 
 const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: Number(value) % 100 ? 2 : 0 }).format(dollars(value))
 const shortMonth = key => new Date(`${key}-01T12:00:00`).toLocaleDateString('en-US', { month: 'short' })
 const normalize = value => String(value || '').trim().toLowerCase()
+export const MESSAGE_CATEGORIES = [
+  { bucket: 'Groceries', label: 'Groceries', icon: '🛒' },
+  { bucket: 'Restaurants/Fast Food', label: 'Dining', icon: '🍽️' },
+  { bucket: 'Shopping/Gifts', label: 'Shopping', icon: '🛍️' },
+]
+const messageDates = summary => {
+  const date = value => value.slice(5).replace('-', '/')
+  return `${date(summary.start)}–${date(summary.end)}`
+}
 
 export function composeWeeklyReminder(summary) {
-  const lines = summary.categories.map(category => {
-    const groceries = category.bucket === WEEKLY_CATEGORIES[0]
-    const label = groceries ? 'Groceries' : 'Dining'
-    const icon = groceries ? '🛒' : '🍽️'
-    return `${icon} ${label}: ${category.available == null ? 'Budget not set' : money(category.available)}`
+  const lines = MESSAGE_CATEGORIES.map(meta => {
+    const category = summary.categories.find(row => row.bucket === meta.bucket)
+    return `${meta.icon} ${meta.label}: ${category?.available == null ? 'Budget not set' : money(category.available)}`
   })
-  const date = value => value.slice(5).replace('-', '/')
+  const missing = MESSAGE_CATEGORIES.filter(meta => summary.categories.find(row => row.bucket === meta.bucket)?.available == null).map(row => row.label)
   return {
-    kind: 'weekly', canSend: true,
-    text: `Budget this week (${date(summary.start)}–${date(summary.end)}):\n${lines.join('\n')}`,
+    kind: 'weekly', canSend: missing.length === 0, missing,
+    text: `Budget this week (${messageDates(summary)}):\n${lines.join('\n')}`,
   }
+}
+
+export function composeWeeklySpending(summary) {
+  const rows = MESSAGE_CATEGORIES.flatMap(meta => (summary.categories.find(row => row.bucket === meta.bucket)?.transactions || []).map(row => ({ ...row, messageCategory: meta })))
+  const biggest = rows.filter(row => cents(row.amount) > 0).sort((left, right) => cents(right.amount) - cents(left.amount) || left.date.localeCompare(right.date))[0]
+  const lines = MESSAGE_CATEGORIES.map(meta => {
+    const category = summary.categories.find(row => row.bucket === meta.bucket)
+    return `${meta.icon} ${meta.label}: ${money(category?.spent || 0)}`
+  })
+  lines.push(biggest ? `💸 Biggest: ${biggest.name} — ${money(cents(biggest.amount))}` : '💸 Biggest: No purchases logged')
+  return { kind: 'weekly-spend', canSend: true, text: `Spent last week (${messageDates(summary)}):\n${lines.join('\n')}` }
 }
 
 export function cutbackPreview({ monthKey, rows = [], budgets = [], savingsSetting = null, asOf = dateKey() }) {
@@ -41,10 +59,4 @@ export function cutbackPreview({ monthKey, rows = [], budgets = [], savingsSetti
   return { kind: 'cutback', canSend: true, text: `Budget check for ${shortMonth(monthKey)}: ${categoryText}.${savingsText} Let's cut back where we can.`, risks, projectedSavings, goal }
 }
 
-export function automaticReminderKey(weekStart) { return `weekly:${weekStart}` }
-export function manualReminderKey(clientId) { return `cutback:${clientId}` }
-export function withinMondayGrace(now = new Date()) {
-  const day = now.getDay(), hour = now.getHours()
-  return day === 1 && hour >= 9 || day === 2 && hour < 9
-}
-export function currentReminderWeek(now = new Date()) { return shiftDay(dateKey(now), -(now.getDay() + 6) % 7) }
+export function manualReminderKey(kind, clientId) { return `${kind}:${clientId}` }

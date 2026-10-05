@@ -1,6 +1,6 @@
 import { actor, json, requireDb } from './_utils.js'
-import { automaticReminderKey, composeWeeklyReminder, cutbackPreview, manualReminderKey } from '../../src/lib/reminders.js'
-import { monday, validDate, validMonth, weeklySummary } from '../../src/lib/weekly.js'
+import { composeWeeklyReminder, composeWeeklySpending, cutbackPreview, manualReminderKey, MESSAGE_CATEGORIES } from '../../src/lib/reminders.js'
+import { monday, validDate, validMonth, weekConfirmation, weeklySummary } from '../../src/lib/weekly.js'
 
 const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i
 
@@ -39,9 +39,16 @@ async function reminderData(db) {
 async function preview(db, body) {
   const data = await reminderData(db)
   if (body.kind === 'weekly') {
-    const weekStart = String(body.weekStart || '')
+    const weekStart = String(body.weekStart || ''), confirmationWeekStart = String(body.confirmationWeekStart || '')
     if (!validDate(weekStart) || monday(weekStart) !== weekStart) throw new Error('Choose a valid reminder week.')
-    return { ...composeWeeklyReminder(weeklySummary(data.transactions, data.budgets, weekStart, { coverage: data.coverage, confirmations: data.confirmations })), periodKey: weekStart }
+    if (!validDate(confirmationWeekStart) || monday(confirmationWeekStart) !== confirmationWeekStart || !weekConfirmation(confirmationWeekStart, data.coverage, data.confirmations).confirmed) throw new Error('Confirm the completed week before sending the new budget.')
+    return { ...composeWeeklyReminder(weeklySummary(data.transactions, data.budgets, weekStart, { coverage: data.coverage, confirmations: data.confirmations, categories: MESSAGE_CATEGORIES.map(row => row.bucket) })), periodKey: weekStart }
+  }
+  if (body.kind === 'weekly-spend') {
+    const weekStart = String(body.weekStart || '')
+    if (!validDate(weekStart) || monday(weekStart) !== weekStart) throw new Error('Choose a valid spending week.')
+    if (!weekConfirmation(weekStart, data.coverage, data.confirmations).confirmed) throw new Error('Confirm the completed week before sending its spending recap.')
+    return { ...composeWeeklySpending(weeklySummary(data.transactions, data.budgets, weekStart, { coverage: data.coverage, confirmations: data.confirmations, categories: MESSAGE_CATEGORIES.map(row => row.bucket) })), periodKey: weekStart }
   }
   if (body.kind === 'cutback') {
     const monthKey = String(body.monthKey || '')
@@ -51,14 +58,14 @@ async function preview(db, body) {
   throw new Error('Invalid reminder type.')
 }
 
-async function queue(db, request, body, automatic = false) {
+async function queue(db, request, body) {
   const result = await preview(db, body)
   if (!result.canSend) return result
-  const clientId = String(body.clientId || ''), idempotencyKey = automatic ? automaticReminderKey(result.periodKey) : manualReminderKey(clientId)
-  if (!automatic && !CLIENT_ID.test(clientId)) throw new Error('Refresh before queuing this message.')
+  const clientId = String(body.clientId || ''), idempotencyKey = manualReminderKey(result.kind, clientId)
+  if (!CLIENT_ID.test(clientId)) throw new Error('Refresh before queuing this message.')
   const now = new Date().toISOString()
   await db.prepare(`INSERT INTO message_outbox(kind,period_key,message_text,idempotency_key,status,requested_at,requested_by)
-    VALUES(?,?,?,?, 'queued',?,?) ON CONFLICT(idempotency_key) DO NOTHING`).bind(result.kind, result.periodKey, result.text, idempotencyKey, now, automatic ? 'monday-automation' : actor(request)).run()
+    VALUES(?,?,?,?, 'queued',?,?) ON CONFLICT(idempotency_key) DO NOTHING`).bind(result.kind, result.periodKey, result.text, idempotencyKey, now, actor(request)).run()
   const item = await db.prepare('SELECT id,kind,period_key,message_text,status,requested_at,sent_at,failed_at,failure FROM message_outbox WHERE idempotency_key=?').bind(idempotencyKey).first()
   return { ...result, queued: true, item: mapMessage(item) }
 }
@@ -70,7 +77,6 @@ export async function onRequestPost({ request, env }) {
     const db = requireDb(env), body = await request.json()
     if (body.action === 'preview') return json(await preview(db, body))
     if (body.action === 'queue') return json(await queue(db, request, body))
-    if (body.action === 'automatic') { requireAgent(request, env); return json(await queue(db, request, { ...body, kind: 'weekly' }, true)) }
     if (body.action === 'claim') {
       requireAgent(request, env)
       const claimToken = crypto.randomUUID(), now = new Date().toISOString()

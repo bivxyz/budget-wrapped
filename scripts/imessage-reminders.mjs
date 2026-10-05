@@ -5,7 +5,7 @@ import { homedir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline/promises'
-import { currentReminderWeek, withinMondayGrace } from '../src/lib/reminders.js'
+import { dateKey, monday, shiftDay } from '../src/lib/weekly.js'
 
 const account = 'budget-wrapped', services = {
   recipient: 'budget-wrapped-recipient', baseUrl: 'budget-wrapped-base-url', accessId: 'budget-wrapped-access-client-id',
@@ -126,17 +126,17 @@ function install() {
   config()
   const launchAgents = resolve(homedir(), 'Library/LaunchAgents'), logs = resolve(homedir(), 'Library/Logs/BudgetWrapped'), uid = process.getuid()
   mkdirSync(launchAgents, { recursive: true }); mkdirSync(logs, { recursive: true })
-  const jobs = [
-    { label: 'com.bivens.budget-wrapped-reminder-poll', mode: 'poll', schedule: '<key>StartInterval</key><integer>60</integer>' },
-    { label: 'com.bivens.budget-wrapped-reminder-weekly', mode: 'weekly', schedule: '<key>StartCalendarInterval</key><dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>' },
-  ]
+  const legacy = resolve(launchAgents, 'com.bivens.budget-wrapped-reminder-weekly.plist')
+  try { execFileSync('/bin/launchctl', ['bootout', `gui/${uid}`, legacy], { stdio: 'ignore' }) } catch {}
+  rmSync(legacy, { force: true })
+  const jobs = [{ label: 'com.bivens.budget-wrapped-reminder-poll', mode: 'poll', schedule: '<key>StartInterval</key><integer>60</integer>' }]
   for (const job of jobs) {
     const path = resolve(launchAgents, `${job.label}.plist`)
     try { execFileSync('/bin/launchctl', ['bootout', `gui/${uid}`, path], { stdio: 'ignore' }) } catch {}
     writeFileSync(path, plist(job), { mode: 0o600 })
     execFileSync('/bin/launchctl', ['bootstrap', `gui/${uid}`, path])
   }
-  console.log('Installed the Budget Wrapped reminder launch agents.')
+  console.log('Installed the Budget Wrapped reminder polling agent and removed the legacy Monday scheduler.')
 }
 
 function uninstall() {
@@ -146,7 +146,7 @@ function uninstall() {
     try { execFileSync('/bin/launchctl', ['bootout', `gui/${uid}`, path], { stdio: 'ignore' }) } catch {}
     rmSync(path, { force: true })
   }
-  console.log('Removed the Budget Wrapped reminder launch agents. Keychain settings were retained.')
+  console.log('Removed the Budget Wrapped reminder polling agent. Keychain settings were retained.')
 }
 
 async function main() {
@@ -155,11 +155,13 @@ async function main() {
   if (command === 'uninstall') return uninstall()
   if (command === 'permission-check') { execFileSync('/usr/bin/osascript', ['-e', 'tell application "Messages" to get name']); console.log('Messages automation permission is available.'); return }
   const settings = config()
-  if (command === 'dry-run') { const result = await api(settings, { action: 'preview', kind: 'weekly', weekStart: currentReminderWeek() }); console.log(result.text); return }
-  if (command === 'weekly') {
-    if (!withinMondayGrace()) { console.log('weekly reminder skipped outside the 24-hour grace window'); return }
-    await api(settings, { action: 'automatic', weekStart: currentReminderWeek() })
-  } else if (command !== 'poll') throw new Error(`Unknown reminder command: ${command}`)
+  if (command === 'dry-run') {
+    const current = monday(dateKey()), prior = shiftDay(current, -7)
+    const result = await api(settings, { action: 'preview', kind: 'weekly', weekStart: current, confirmationWeekStart: prior })
+    console.log(result.text); return
+  }
+  if (command === 'weekly') { console.log('automatic weekly reminders are disabled; send from the dashboard'); return }
+  if (command !== 'poll') throw new Error(`Unknown reminder command: ${command}`)
   await processQueue(settings)
 }
 
