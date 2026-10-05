@@ -11,7 +11,10 @@ const paths={
   home:<><path d="m3 11 9-8 9 8"/><path d="M5 10v11h14V10"/><path d="M9 21v-7h6v7"/></>,
   transactions:<><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></>,
   weekly:<><path d="M4 6h16v14H4z"/><path d="M8 3v6M16 3v6M4 10h16"/></>,
-  trends:<><path d="M4 19V5M4 19h16"/><path d="m7 15 4-5 3 3 5-7"/></>
+  trends:<><path d="M4 19V5M4 19h16"/><path d="m7 15 4-5 3 3 5-7"/></>,
+  message:<><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M8 9h8M8 13h5"/></>,
+  receipt:<><path d="M5 3v18l3-2 4 2 4-2 3 2V3l-3 2-4-2-4 2z"/><path d="M8 9h8M8 13h6"/></>,
+  more:<><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/></>
 }
 
 export function Icon({name,size=19}){return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>}

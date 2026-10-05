@@ -1,4 +1,4 @@
-import { useMemo,useState } from 'react'
+import { useEffect,useMemo,useRef,useState } from 'react'
 import { LineChart,Line,XAxis,YAxis,Tooltip,ResponsiveContainer } from 'recharts'
 import Slideshow from './Slideshow.jsx'
 import ManualExpense from './ManualExpense.jsx'
@@ -10,6 +10,7 @@ import SelectMenu from './SelectMenu.jsx'
 import ExportMenu from './ExportMenu.jsx'
 import IconButton,{Icon} from './IconButton.jsx'
 import TrackerUpload from './TrackerUpload.jsx'
+import WeeklyTextActions from './WeeklyTextActions.jsx'
 import { formatCurrency } from '../lib/finance.js'
 import { effectiveTransaction } from '../lib/tracker.js'
 import { annualTrendView,shiftMonth } from '../lib/portfolio.js'
@@ -50,9 +51,8 @@ export default function PortfolioDashboardV2({portfolio,archive,shared,onSharedC
         <div className="titlebar-actions">
           <ConnectionDot shared={shared}/>
           {['overview','transactions','weekly'].includes(view)&&<button className="primary-button titlebar-add" disabled={!shared.available||(locked&&view!=='weekly')} onClick={()=>openManual(null)}><Icon name="plus" size={17}/><span>Add expense</span></button>}
-          <IconButton onClick={openUpload} disabled={!shared.available||locked} icon="upload" label="Upload Rocket Money CSV"/>
-          <ExportMenu month={month} shared={shared} portfolio={portfolio}/>
-          <IconButton onClick={()=>changeView('slideshow')} disabled={!data||!rows.length} icon="replay" label="Replay Wrapped"/>
+          <WeeklyTextActions shared={shared} onChanged={onSharedChanged}/>
+          <HeaderUtilityMenu onUpload={openUpload} uploadDisabled={!shared.available||locked} month={month} shared={shared} portfolio={portfolio} onReplay={()=>changeView('slideshow')} replayDisabled={!data||!rows.length}/>
         </div>
       </header>
       <main className="budget-app-content">
@@ -73,6 +73,7 @@ export default function PortfolioDashboardV2({portfolio,archive,shared,onSharedC
 
 function Navigation({view,onChange,mobile=false}){return <nav className={mobile?'budget-mobile-nav':'budget-rail'} aria-label="Primary navigation">{!mobile&&<div className="rail-monogram" aria-label="Budget Wrapped">BW</div>}{tabs.map(([key,label,icon])=><button key={key} onClick={()=>onChange(key)} className={`rail-link ${view===key?'rail-link-active':''}`} aria-current={view===key?'page':undefined}><Icon name={icon} size={20}/><span>{label}</span></button>)}</nav>}
 function ConnectionDot({shared}){return <span className={`connection-dot ${shared.available?'connection-dot-online':'connection-dot-offline'}`} title={shared.available?'Shared family data connected':'Shared editing offline'}><span aria-hidden="true"/><span className="sr-only">{shared.available?'Shared family data connected':'Shared editing offline'}</span></span>}
+function HeaderUtilityMenu({onUpload,uploadDisabled,month,shared,portfolio,onReplay,replayDisabled}){const [open,setOpen]=useState(false),container=useRef(null);useEffect(()=>{const close=event=>{if(!container.current?.contains(event.target))setOpen(false)};document.addEventListener('pointerdown',close);return()=>document.removeEventListener('pointerdown',close)},[]);return <div className="header-utility" ref={container}><IconButton icon="more" label="More actions" aria-expanded={open} onClick={()=>setOpen(value=>!value)}/>{open&&<div className="header-utility-popover"><button type="button" className="header-utility-item" disabled={uploadDisabled} onClick={()=>{setOpen(false);onUpload()}}><Icon name="upload" size={18}/><span>Upload Rocket Money CSV</span></button><ExportMenu mode="menu" month={month} shared={shared} portfolio={portfolio}/><button type="button" className="header-utility-item" disabled={replayDisabled} onClick={()=>{setOpen(false);onReplay()}}><Icon name="replay" size={18}/><span>Replay Wrapped</span></button></div>}</div>}
 function SharedStatus(){return <div className="app-notice app-notice-warning">Shared editing is offline. The dashboard remains readable, but uploads and edits require D1.</div>}
 const monthLabel=key=>new Date(2000,Number(key.slice(5))-1,1).toLocaleString('en-US',{month:'short'}),monthLabelLong=key=>new Date(Number(key.slice(0,4)),Number(key.slice(5))-1,1).toLocaleString('en-US',{month:'long',year:'numeric'}),axisCurrency=value=>Math.abs(value)>=1000?`$${Math.round(value/1000)}k`:`$${Math.round(value)}`
 

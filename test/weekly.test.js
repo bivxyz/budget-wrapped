@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cents, dailyAllowance, expectedIncome, incomeSuggestion, monday, monthlyFromWeekly, previousMonthWeekly, recommendWeekly, savingsPosition, weekCanBeConfirmed, weeklyBaselines, weeklyFromMonthly, weeklyLoggingStreak, weeklySummary } from '../src/lib/weekly.js'
+import { cents, dailyAllowance, expectedIncome, incomeSuggestion, latestCompletedWeek, monday, monthlyFromWeekly, previousMonthWeekly, recommendWeekly, savingsPosition, weekCanBeConfirmed, weeklyBaselines, weeklyFromMonthly, weeklyLoggingStreak, weeklySummary } from '../src/lib/weekly.js'
 import { matchSuggestions } from '../src/lib/reconciliation.js'
 import { monthlySummary } from '../src/lib/tracker.js'
 
@@ -11,6 +11,8 @@ test('daily cent allocation reconciles each calendar month including leap Februa
   assert.equal(monday('2027-01-01'),'2026-12-28')
   assert.equal(weekCanBeConfirmed('2026-10-04','2026-10-04'),true)
   assert.equal(weekCanBeConfirmed('2026-10-04','2026-10-03'),false)
+  assert.equal(latestCompletedWeek('2026-10-05'),'2026-09-28')
+  assert.equal(latestCompletedWeek('2026-10-11'),'2026-10-05')
 })
 test('weekly logging streak counts explicit consecutive completed-week sign-offs', () => {
   const confirmations=[

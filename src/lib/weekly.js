@@ -19,6 +19,9 @@ export function monday(key) {
   return shiftDay(key, -(new Date(`${key}T12:00:00`).getDay() + 6) % 7)
 }
 export const sunday = key => shiftDay(monday(key), 6)
+export function latestCompletedWeek(today = dateKey()) {
+  return sunday(monday(today)) <= today ? monday(today) : shiftDay(monday(today), -7)
+}
 export const weekCanBeConfirmed = (weekEnd, today = dateKey()) => weekEnd <= today
 export const activeTransactions = rows => rows.filter(row => !row.deletedAt && !row.matchedTxnKey)
 
