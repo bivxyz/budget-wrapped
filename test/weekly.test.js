@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cents, dailyAllowance, expectedIncome, incomeSuggestion, latestCompletedWeek, monday, monthlyFromWeekly, previousMonthWeekly, recommendWeekly, savingsPosition, weekCanBeConfirmed, weeklyBaselines, weeklyFromMonthly, weeklyLoggingStreak, weeklySummary } from '../src/lib/weekly.js'
+import { cents, dailyAllowance, expectedIncome, incomeSuggestion, latestCompletedWeek, manualWeeklyExpenses, monday, monthlyFromWeekly, previousMonthWeekly, recommendWeekly, savingsPosition, weekCanBeConfirmed, weeklyBaselines, weeklyFromMonthly, weeklyLoggingStreak, weeklySummary } from '../src/lib/weekly.js'
 import { matchSuggestions } from '../src/lib/reconciliation.js'
 import { monthlySummary } from '../src/lib/tracker.js'
 
@@ -28,6 +28,11 @@ test('weekly logging streak counts explicit consecutive completed-week sign-offs
   assert.equal(mondayResult.recent.at(-3).status,'missed')
   const sundayResult=weeklyLoggingStreak([...confirmations,{weekStart:'2026-10-12'}],'2026-10-18')
   assert.equal(sundayResult.current,3)
+})
+test('weekly expense log includes only active unreconciled manual expenses',()=>{
+  const base={date:'2026-10-02',amount:20,name:'Cafe',bucket:'Restaurants/Fast Food',flow:'Expense'}
+  const result=manualWeeklyExpenses([{...base,txnKey:'manual',source:'manual'},{...base,txnKey:'import',source:'import'},{...base,txnKey:'deleted',source:'manual',deletedAt:'now'},{...base,txnKey:'matched',source:'manual',matchedTxnKey:'import'},{...base,txnKey:'ignored',source:'manual',overrideFlow:'Ignore'}],'2026-09-28')
+  assert.deepEqual(result.map(row=>row.txnKey),['manual'])
 })
 test('cross-month allowances require both targets and spending uses active expense rows', () => {
   const budgets=[{monthKey:'2026-08',bucket:'Groceries',target:310},{monthKey:'2026-09',bucket:'Groceries',target:600}]

@@ -49,13 +49,14 @@ test('reminder outbox is idempotent, agent protected, and records delivery',asyn
   assert.equal(db.sqlite.prepare('SELECT status FROM message_outbox').get().status,'sent')
 })
 test('manual weekly budget and spending messages require confirmation and queue separately',async()=>{
-  const db=database();db.sqlite.exec("INSERT INTO monthly_budgets(month_key,bucket,target,paced,updated_at,updated_by,sort_order) VALUES('2027-02','Groceries',1000,1,'now','test',0),('2027-02','Restaurants/Fast Food',400,1,'now','test',1),('2027-02','Shopping/Gifts',280,1,'now','test',2); INSERT INTO transactions(txn_key,date,amount,name,bucket,account,is_income,uploaded_at,uploaded_by,source,imported_flow) VALUES('shop','2027-02-03',50,'Target','Shopping/Gifts','Card',0,'now','test','manual','Expense')")
+  const db=database();db.sqlite.exec("INSERT INTO monthly_budgets(month_key,bucket,target,paced,updated_at,updated_by,sort_order) VALUES('2027-02','Groceries',1000,1,'now','test',0),('2027-02','Restaurants/Fast Food',400,1,'now','test',1),('2027-02','Shopping/Gifts',280,1,'now','test',2); INSERT INTO transactions(txn_key,date,amount,name,bucket,account,is_income,uploaded_at,uploaded_by,source,imported_flow) VALUES('shop','2027-02-03',50,'Target','Shopping/Gifts','Card',0,'now','test','manual','Expense'),('imported-shop','2027-02-03',75,'Target import','Shopping/Gifts','Card',0,'now','test','import','Expense')")
   const id='12345678-1234-1234-1234-123456789012'
   assert.equal((await call(reminders,db,{action:'preview',kind:'weekly-spend',weekStart:'2027-02-01'})).httpStatus,400)
   db.sqlite.exec("INSERT INTO weekly_confirmations VALUES('2027-02-01','2027-02-07','now','test')")
   const spend=await call(reminders,db,{action:'queue',kind:'weekly-spend',weekStart:'2027-02-01',clientId:id})
   const budget=await call(reminders,db,{action:'queue',kind:'weekly',weekStart:'2027-02-08',confirmationWeekStart:'2027-02-01',clientId:'22345678-1234-1234-1234-123456789012'})
   assert.equal(spend.httpStatus,200);assert.equal(budget.httpStatus,200)
+  assert.match(spend.text,/🛍️ Shopping: \$50(?:\n|$)/);assert.doesNotMatch(spend.text,/\$125/)
   assert.deepEqual(db.sqlite.prepare('SELECT kind FROM message_outbox ORDER BY id').all().map(row=>row.kind),['weekly-spend','weekly'])
   assert.equal((await call(reminders,db,{action:'automatic',weekStart:'2027-02-08'},'agent-secret')).httpStatus,400)
 })

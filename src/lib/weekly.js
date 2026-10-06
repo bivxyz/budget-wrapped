@@ -24,6 +24,10 @@ export function latestCompletedWeek(today = dateKey()) {
 }
 export const weekCanBeConfirmed = (weekEnd, today = dateKey()) => weekEnd <= today
 export const activeTransactions = rows => rows.filter(row => !row.deletedAt && !row.matchedTxnKey)
+export function manualWeeklyExpenses(rows, day = dateKey()) {
+  const start = monday(day), end = shiftDay(start, 6)
+  return activeTransactions(rows).filter(row => row.source === 'manual').map(effectiveTransaction).filter(row => row.flow === 'Expense' && row.date >= start && row.date <= end).sort((left, right) => left.date.localeCompare(right.date) || String(left.createdAt || '').localeCompare(String(right.createdAt || '')))
+}
 
 export function weeklyLoggingStreak(confirmations = [], asOf = dateKey()) {
   const currentWeek = monday(asOf)

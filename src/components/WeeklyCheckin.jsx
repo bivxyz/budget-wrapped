@@ -3,7 +3,7 @@ import { formatCurrency } from '../lib/finance.js'
 import { normalizeMatchText } from '../lib/reconciliation.js'
 import { postJson } from '../lib/sharedState.js'
 import { effectiveTransaction } from '../lib/tracker.js'
-import { activeTransactions,dateKey,latestCompletedWeek,shiftDay,weekCanBeConfirmed,weekConfirmation } from '../lib/weekly.js'
+import { activeTransactions,dateKey,latestCompletedWeek,manualWeeklyExpenses,shiftDay,weekCanBeConfirmed,weekConfirmation } from '../lib/weekly.js'
 
 const prettyDate=value=>new Date(`${value}T12:00:00`).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})
 const shortDate=value=>value.slice(5).replace('-', '/')
@@ -14,7 +14,7 @@ export default function WeeklyCheckin({shared,categories,onChanged}){
   const [categoryFilter,setCategoryFilter]=useState('all')
   const merchantInput=useRef(null)
   const accounts=useMemo(()=>[...new Set((shared.transactions||[]).map(row=>row.account).filter(Boolean))].sort(),[shared.transactions])
-  const rows=useMemo(()=>(shared.transactions||[]).filter(row=>row.source==='manual'&&!row.deletedAt&&!row.matchedTxnKey&&row.date>=week&&row.date<=end).sort((left,right)=>left.date.localeCompare(right.date)||String(left.createdAt||'').localeCompare(String(right.createdAt||''))),[shared.transactions,week,end])
+  const rows=useMemo(()=>manualWeeklyExpenses(shared.transactions||[],week),[shared.transactions,week])
   const rowCategories=useMemo(()=>[...new Set(rows.map(row=>row.bucket).filter(Boolean))].sort(),[rows])
   const filteredRows=categoryFilter==='all'?rows:rows.filter(row=>row.bucket===categoryFilter)
   const filteredTotal=filteredRows.reduce((sum,row)=>sum+Number(row.amount||0),0),confirmation=weekConfirmation(week,shared.importCoverage||[],shared.weeklyConfirmations||[]),confirmable=weekCanBeConfirmed(end,today)

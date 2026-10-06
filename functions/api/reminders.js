@@ -1,6 +1,6 @@
 import { actor, json, requireDb } from './_utils.js'
 import { BUDGET_MESSAGE_CATEGORIES, composeWeeklyReminder, composeWeeklySpending, cutbackPreview, manualReminderKey, SPENDING_MESSAGE_CATEGORIES } from '../../src/lib/reminders.js'
-import { monday, validDate, validMonth, weekConfirmation, weeklySummary } from '../../src/lib/weekly.js'
+import { manualWeeklyExpenses, monday, validDate, validMonth, weekConfirmation, weeklySummary } from '../../src/lib/weekly.js'
 
 const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i
 
@@ -48,7 +48,8 @@ async function preview(db, body) {
     const weekStart = String(body.weekStart || '')
     if (!validDate(weekStart) || monday(weekStart) !== weekStart) throw new Error('Choose a valid spending week.')
     if (!weekConfirmation(weekStart, data.coverage, data.confirmations).confirmed) throw new Error('Confirm the completed week before sending its spending recap.')
-    return { ...composeWeeklySpending(weeklySummary(data.transactions, data.budgets, weekStart, { coverage: data.coverage, confirmations: data.confirmations, categories: SPENDING_MESSAGE_CATEGORIES.map(row => row.bucket) })), periodKey: weekStart }
+    const loggedExpenses = manualWeeklyExpenses(data.transactions, weekStart)
+    return { ...composeWeeklySpending(weeklySummary(loggedExpenses, data.budgets, weekStart, { coverage: data.coverage, confirmations: data.confirmations, categories: SPENDING_MESSAGE_CATEGORIES.map(row => row.bucket) })), periodKey: weekStart }
   }
   if (body.kind === 'cutback') {
     const monthKey = String(body.monthKey || '')
